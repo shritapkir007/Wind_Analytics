@@ -1,6 +1,6 @@
 # Wind Ops — Phase 2: System Architecture
 
-Status: **proposal, awaiting approval** · Source analysis date: 23 Nov 2026
+Status: **approved 23 Nov 2026** · Source analysis date: 23 Nov 2026
 
 This document is the reference for the data model, the mapping from each sheet,
 the synchronisation logic and every KPI formula. Anything marked **[CONFIRM]**
@@ -103,7 +103,7 @@ Comment from Calendar View, Zoho Applied ?, Manager's Note.
 | Leave request with no matching calendar code (or vice versa) | — | issue (warning) "request/calendar mismatch" |
 | Resigned person still has an email (e.g. `dhanush.s` under *Resigned*) | treated as inactive | issue (info) |
 | Row 4 of Calendar View hard-codes 93 people | ignored; we compute from the roster | issue (info) |
-| Calendar headcount formula gives half-day **WL** 0 (only CL/EL/EL CF halves = 0.5) | mirrored exactly (D2) | issue (info) **[CONFIRM: intended?]** |
+| Calendar headcount formula gives half-day **WL** 0 | app uses 0.5 (decision 23 Nov); the headcount reconciliation excludes this difference | issue (info) |
 
 ---
 
@@ -181,8 +181,7 @@ Notation: *d* = a date, *e* = employee, *p* = process. All periods are in IST.
 |---|---|---|
 | blank, `Working` | 1 | present |
 | `WFH` | 1 | present (WFH) |
-| `First/Second Half` CL, EL, EL CF | 0.5 | half leave |
-| `First/Second Half WL` | 0 *(as the sheet does)* | half leave |
+| `First/Second Half` CL, EL, EL CF, WL | 0.5 | half leave (half-day WL = 0.5 by decision 23 Nov; the sheet's own formula gives it 0, and the reconciliation check allows for that) |
 | EL, CL, WL, PL, EL CF, Comp Off | 0 | leave |
 | LoP | 0 | absent (unpaid) |
 | `Week Off` | — | not a working day |
@@ -214,7 +213,7 @@ Notation: *d* = a date, *e* = employee, *p* = process. All periods are in IST.
   lowers productivity. Output on an off day still counts in the numerator and is flagged.
 * **Target coverage %** = share of a person's raw output in processes that have a target. It is
   shown next to every productivity figure, so people doing mostly untargeted work (Pilot uploads,
-  Critical Review…) aren't mis-ranked. Ranking uses only employees with coverage ≥ 70 % **[CONFIRM threshold]**.
+  Critical Review…) aren't mis-ranked. Ranking uses only employees with coverage ≥ 70 % and ≥ 5 present days in the period (editable in Settings).
 * **Team productivity %** = Σ_e target-days earned ÷ Σ_e presence days × 100.
 * **Target vs actual (process p, period)**: target = target_per_day(p) × presence-days spent on p
   (a day counts toward p when the person logged p that day, split by target-day share);
@@ -234,9 +233,19 @@ Process → target mapping (from `Target` tab, using the *Average WTG/Day* colum
 | ZDT Data Process | 8 | ZDT · Data Processing |
 | Data Process | 7 | Internal-DP · Data Processing |
 | Audit-2026 | 11 | Audit · Audit Work |
-| Full Internal Inspection(P+A+FQC) | 1.6 *(derived: 1 ÷ (1/3.1 + 1/3.3))* | **[CONFIRM]** |
-| ZDT Pitch Bearing Data Process / Prescreen+Analysis / FQC | none | **[CONFIRM: same as ZDT equivalents?]** |
-| All other columns (Ext_QI Resolved, Critical Review, SN Update Insights, Ext/Int_Eng Review, Int_QI Resolved+Blade swap, Pilot-Uploaders, Data Process_QI-Rework, Nacelle, Tower, Cooler Top, HUB Inspection, Nordex Calculation, ZDT QI Resolved, Skyspecs Data upload) | none → counted as output, excluded from productivity | **[CONFIRM or provide targets]** |
+| ZDT Pitch Beraring Data Process | 8 | same as ZDT · Data Processing (decision 23 Nov) |
+| ZDT Pitch Beraring Prescreen+Analysis | 9.5 | same as ZDT · PreScreen + Analysis |
+| ZDT Pitch Beraring FQC | 11.5 | same as ZDT · FQC |
+| Skyspecs Data upload | **in productivity; target read from the `Target` tab** | no row exists yet, so it shows "target missing" until one is added |
+| Full Internal Inspection(P+A+FQC) | only if a `Target` tab row exists (none today) | no derived values (decision 23 Nov) |
+| Ext_QI Resolved, Critical Review, SN Update Insights, Ext/Int_Eng Review, Int_QI Resolved+Blade swap, Pilot-Uploaders, Data Process_QI-Rework, Nacelle, Tower, Cooler Top, HUB Inspection, Nordex Calculation, ZDT QI Resolved | counted as output, **excluded** from productivity | decision 23 Nov |
+
+Targets are **never hard-coded or derived**. They are read from the `Target` tab on every sync,
+and the mapping above only links a `User Input` column to a `Target` row (Method + Process).
+The target used is always shown next to each productivity figure. The `Target` tab's range
+(e.g. "10-12") and average (11) are both shown; the average is used in the calculation.
+The per-person targets in the leave tracker's `Team` tab (a January snapshot that is no longer
+maintained) differ from these and are **not** used.
 
 ### 6.4 Deliveries (from `Active ZV`, per stream External / Internal / ZDT)
 
