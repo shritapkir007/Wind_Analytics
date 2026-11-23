@@ -30,7 +30,7 @@ describe("normalise", () => {
   });
   it("normalises emails", () => {
     expect(normEmail(" Asha.One+old@Example.com ")).toBe("asha.one@example.com");
-    expect(normEmail("jayaseelan.​neduncheliyan@zeitview.com")).toBe("jayaseelan.neduncheliyan@zeitview.com");
+    expect(normEmail("ben.\u200Btwo@example.com")).toBe("ben.two@example.com");
     expect(normEmail("Asha")).toBeNull();
   });
   it("parses numbers and free text", () => {
