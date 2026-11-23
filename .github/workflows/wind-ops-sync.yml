@@ -1,0 +1,28 @@
+# Scheduled synchronisation for the Wind Ops web app.
+# Needs repository secrets: WIND_OPS_URL (e.g. https://wind-ops.vercel.app) and WIND_OPS_CRON_SECRET.
+name: Wind Ops sync
+
+on:
+  schedule:
+    - cron: "*/15 1-17 * * *"   # every 15 min, 06:30–23:15 IST (quick sync)
+    - cron: "30 20 * * *"       # 02:00 IST (full sync incl. reconciliation against pivot tabs)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: quick or full
+        default: quick
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ vars.WIND_OPS_SYNC_ENABLED == 'true' }}
+    steps:
+      - name: Trigger sync
+        env:
+          URL: ${{ secrets.WIND_OPS_URL }}
+          SECRET: ${{ secrets.WIND_OPS_CRON_SECRET }}
+          MODE: ${{ github.event.inputs.mode || (github.event.schedule == '30 20 * * *' && 'full' || 'quick') }}
+        run: |
+          code=$(curl -s -o out.json -w '%{http_code}' -X POST -H "Authorization: Bearer $SECRET" "$URL/api/sync?mode=$MODE")
+          cat out.json
+          test "$code" = "200"

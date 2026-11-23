@@ -42,6 +42,8 @@ next-env.d.ts
 
 # local data
 /.data
-/fixtures/*.local.json
+/fixtures/*.json
 /test-results
 /playwright-report
+
+!.env.example

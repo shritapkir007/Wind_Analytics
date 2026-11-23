@@ -3,8 +3,7 @@
 Status: **approved 23 Nov 2026** · Source analysis date: 23 Nov 2026
 
 This document is the reference for the data model, the mapping from each sheet,
-the synchronisation logic and every KPI formula. Anything marked **[CONFIRM]**
-needs a decision before it is implemented.
+the synchronisation logic and every KPI formula. The implementation lives in `web/`.
 
 ---
 
@@ -47,7 +46,7 @@ needs a decision before it is implemented.
 | C | `Data Added By` | audit (who entered it; flag when ≠ A) |
 | D | `Timestamp` (DD/MM/YYYY HH:MM:SS, IST) | submission time; "late entry" = Timestamp date > Output_Date + 1 |
 | E | `Which Backend Sheets Updated ?` | ignored (derivable) |
-| F | `Output Entry Status` | only `Updated` rows count **[CONFIRM: other values seen?]** |
+| F | `Output Entry Status` | every row counts (the pivot tabs count them all); any value other than `Updated` is listed as a data-quality note |
 | G–AI | 29 numeric process columns | `output_entries` (long format, qty > 0 only) |
 | AJ | `Other_Work` | free text → `output_submissions.other_work_note` (not summed) |
 | AK | `Team Lead's Notes` | free text → note |
@@ -154,9 +153,9 @@ Every KPI is a SQL view over these tables, so each number can be traced to rows
 * **Auth**: a Google Cloud service account with Sheets API read-only scope
   (`spreadsheets.readonly`). The three sheets are shared with it as *Viewer*. Its key lives only
   in server environment variables.
-* **Schedule**: every 15 min, 07:00–23:00 IST, plus a full sync at 02:00. Triggered by Supabase
-  `pg_cron` calling a protected route `/api/sync` (Vercel Hobby cron is daily-only; Vercel Pro cron
-  is an alternative).
+* **Schedule**: every 15 min, 06:30–23:15 IST, plus a full sync at 02:00 IST, by the GitHub Actions
+  workflow `.github/workflows/wind-ops-sync.yml` calling the protected route `/api/sync`
+  (any scheduler that can send `Authorization: Bearer <CRON_SECRET>` works).
 * **Manual refresh**: "Sync now" button (admin/manager) → same route.
 * **Per tab**: `spreadsheets.values.batchGet` (FORMATTED_VALUE) → parse → validate (zod) →
   compute `row_hash` per business key → upsert changed rows, mark vanished keys deleted →
@@ -189,7 +188,8 @@ Notation: *d* = a date, *e* = employee, *p* = process. All periods are in IST.
 
 * **Present today** = Σ presence_weight over active employees for today.
 * **On leave today** = count of active employees with a leave or half-leave code today.
-* **Absent today** = count with LoP **or** an approved *Time Off – Unplanned* request covering today.
+* **Absent today** = count with LoP **or** an approved *Time Off – Unplanned* request covering today
+  (these are not also counted in *On leave*).
   Without one of these, nobody is counted absent (a missing output entry is "no output logged",
   not absence).
 * **Scheduled days(e, period)** = days that are not `Week Off` / `Public Holiday`.
@@ -276,9 +276,17 @@ computed (due_on < today and status ≠ Completed), never stored. Workload = ope
 
 ### 6.7 Change vs previous period
 
-Every KPI card compares with the previous equal-length period (today vs previous working day,
-week vs last week, month vs same days of last month) and shows Δ and Δ %.
-If the previous value is 0 the % is shown as "—".
+Every KPI card compares with the previous equal-length period and shows Δ and Δ %. A single day
+compares with the **previous working day** (a day on which at least half the active roster was
+scheduled, so Saturdays with a few people working are skipped). Daily / weekly / monthly output
+windows end at the latest working day that most present people have logged (people log at the
+end of their day). If the previous value is 0 the % is shown as "—".
+
+### 6.8 Overtime
+
+`Wind OT tracker 2026` rows are matched to people by Employee ID, then by name (Calendar View,
+Employee ID and Employee List names). Shift "Half Day" = 0.5, otherwise 1. Shown per person on
+the profile page; output itself always comes from User Input, so overtime is never double-counted.
 
 ---
 
@@ -338,8 +346,5 @@ Roles: admin, manager, lead, viewer (the employee-login role is reserved for lat
 
 ## 10. What is needed from you
 
-1. A Google Cloud project (or permission to create one), to issue the service-account email the three
-   sheets will be shared with.
-2. A Supabase project and a Vercel account (free tiers are enough to start).
-3. A Google OAuth client for sign-in (created in the same Cloud project).
-4. Answers to the **[CONFIRM]** items above.
+Step-by-step setup is in [`web/README.md`](../web/README.md): a Google Cloud project (service
+account + OAuth client), a Supabase project and a Vercel project.

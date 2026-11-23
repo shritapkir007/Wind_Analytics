@@ -29,6 +29,7 @@ async function connect(): Promise<DB> {
   const { drizzle } = await import("drizzle-orm/pglite");
   const { migrate } = await import("drizzle-orm/pglite/migrator");
   const dir = process.env.PGLITE_DIR ?? path.join(process.cwd(), ".data", "pglite");
+  if (dir !== ":memory:") (await import("node:fs")).mkdirSync(dir, { recursive: true });
   const client = new PGlite(dir === ":memory:" ? undefined : dir);
   const db = drizzle(client, { schema });
   await migrate(db, { migrationsFolder: MIGRATIONS });

@@ -22,7 +22,9 @@ export interface Task {
   updatedAt: string;
 }
 
-export interface ProcessInfo extends ProcessDef {
+export interface ProcessInfo extends Omit<ProcessDef, "target"> {
+  /** How the Target tab row is looked up. */
+  lookup: ProcessDef["target"];
   target: ResolvedTarget;
   /** In productivity AND has a usable target value. */
   counts: boolean;
@@ -63,7 +65,7 @@ export function buildDataset(input: {
   for (const c of cols) {
     const def = processFor(c);
     const target = resolveTarget(def, input.targets);
-    processes.set(c, { ...def, target, counts: def.inProductivity && target.perDay != null });
+    processes.set(c, { ...def, lookup: def.target, target, counts: def.inProductivity && target.perDay != null });
   }
   const calendar = new Map(input.calendar.map((d) => [`${d.employeeKey}|${d.date}`, d]));
   return {
@@ -573,15 +575,45 @@ export function change(cur: number | null, prev: number | null) {
   return { abs: cur - prev, pct: prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : null };
 }
 
-/** The previous comparable period. A single day compares with the previous day that had attendance. */
+/** A working day = at least half of the active roster was scheduled (not week off / holiday). */
+export function isWorkingDay(ds: Dataset, d: string): boolean {
+  let scheduled = 0;
+  let total = 0;
+  for (const e of ds.employees) {
+    if (!e.isActive) continue;
+    const c = ds.calendar.get(`${e.key}|${d}`);
+    if (!c) continue;
+    total++;
+    if (c.presence !== null) scheduled++;
+  }
+  return total > 0 && scheduled >= total / 2;
+}
+
+export function previousWorkingDay(ds: Dataset, before: string): string {
+  let d = addDays(before, -1);
+  for (let i = 0; i < 21; i++, d = addDays(d, -1)) if (isWorkingDay(ds, d)) return d;
+  return addDays(before, -1);
+}
+
+/**
+ * Latest working day whose output can be reported: today once most present people have logged,
+ * otherwise the previous working day (people log at the end of their day).
+ */
+export function latestOutputDay(ds: Dataset): string {
+  const t = ds.today;
+  if (isWorkingDay(ds, t)) {
+    const present = ds.employees.filter((e) => e.isActive && (ds.calendar.get(`${e.key}|${t}`)?.presence ?? 0) > 0).length;
+    const logged = new Set(ds.submissions.filter((s) => s.date === t).map((s) => s.employeeKey)).size;
+    if (present > 0 && logged >= present / 2) return t;
+  }
+  return previousWorkingDay(ds, t);
+}
+
+/** The previous comparable period. A single day compares with the previous working day. */
 export function comparisonPeriod(ds: Dataset, f: { from: string; to: string }) {
   if (f.from === f.to) {
-    let d = addDays(f.from, -1);
-    for (let i = 0; i < 14; i++, d = addDays(d, -1)) {
-      const anyWork = ds.employees.some((e) => e.isActive && (ds.calendar.get(`${e.key}|${d}`)?.presence ?? 0) > 0);
-      if (anyWork) return { from: d, to: d };
-    }
-    return previousPeriod(f.from, f.to);
+    const d = previousWorkingDay(ds, f.from);
+    return { from: d, to: d };
   }
   return previousPeriod(f.from, f.to);
 }

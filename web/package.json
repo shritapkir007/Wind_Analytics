@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "sync": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/sync.ts",
+    "fixture": "tsx scripts/make-fixture.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.8",
