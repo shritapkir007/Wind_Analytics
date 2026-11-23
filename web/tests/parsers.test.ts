@@ -29,9 +29,9 @@ describe("normalise", () => {
     expect(parseSlackTimestamp("November 17th, 2026 at 5:27 PM GMT+5:30")).toBe("2026-11-17T17:27:00+05:30");
   });
   it("normalises emails", () => {
-    expect(normEmail(" Hardik.Astik+old@Zeitview.com ")).toBe("hardik.astik@zeitview.com");
+    expect(normEmail(" Asha.One+old@Example.com ")).toBe("asha.one@example.com");
     expect(normEmail("jayaseelan.​neduncheliyan@zeitview.com")).toBe("jayaseelan.neduncheliyan@zeitview.com");
-    expect(normEmail("Shrikant")).toBeNull();
+    expect(normEmail("Asha")).toBeNull();
   });
   it("parses numbers and free text", () => {
     expect(parseNumber("1.33")).toEqual({ value: 1.33, ok: true });

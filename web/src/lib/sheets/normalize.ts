@@ -17,7 +17,7 @@ export function normEmail(v: Cell): string | null {
   return m ? `${m[1]}@${m[2]}` : null;
 }
 
-/** Name key used to match names across tabs ("Jyoti bargall" vs "jyoti baragall" stay distinct). */
+/** Name key used to match names across tabs (different spellings stay distinct). */
 export function nameKey(v: Cell): string {
   return clean(v).toLowerCase().replace(/[^a-z]/g, "");
 }

@@ -91,7 +91,7 @@ Comment from Calendar View, Zoho Applied ?, Manager's Note.
 |---|---|---|
 | Dates are **day-first** everywhere except the leave `Dashboard` A1 (M/D) | strict `d/M/yyyy` parser; ambiguous or invalid → row rejected | `sync_issues` (severity: error) |
 | Slack prose timestamps ("December 31st, 2025 at 11:39 AM GMT+5:30") | dedicated parser | issue if unparsable |
-| Employee identity | key = lower-cased, trimmed email with zero-width chars removed; `+suffix` stripped (`hardik.astik+old@` → `hardik.astik@`) | — |
+| Employee identity | key = lower-cased, trimmed email with zero-width chars removed; `+suffix` stripped (`name+old@` → `name@`) | — |
 | Name spelling variants across tabs | display name comes from `Calendar View` only | — |
 | Output for an email not in `Calendar View` | kept, attributed to an "unmatched" employee | Data Quality → Unmatched people |
 | Repeat (email, Output_Date) in `User Input` | **first row kept, others quarantined** (never summed) | issue (error) |
