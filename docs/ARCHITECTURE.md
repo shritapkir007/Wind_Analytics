@@ -92,7 +92,7 @@ Comment from Calendar View, Zoho Applied ?, Manager's Note.
 | Dates are **day-first** everywhere except the leave `Dashboard` A1 (M/D) | strict `d/M/yyyy` parser; ambiguous or invalid → row rejected | `sync_issues` (severity: error) |
 | Slack prose timestamps ("December 31st, 2025 at 11:39 AM GMT+5:30") | dedicated parser | issue if unparsable |
 | Employee identity | key = lower-cased, trimmed email with zero-width chars removed; `+suffix` stripped (`hardik.astik+old@` → `hardik.astik@`) | — |
-| Name variants ("jyoti bargall"/"baragall") | display name comes from `Calendar View` only | — |
+| Name spelling variants across tabs | display name comes from `Calendar View` only | — |
 | Output for an email not in `Calendar View` | kept, attributed to an "unmatched" employee | Data Quality → Unmatched people |
 | Repeat (email, Output_Date) in `User Input` | **first row kept, others quarantined** (never summed) | issue (error) |
 | Output logged on a non-present day (leave / week off / holiday) | kept, counted | issue (warning) "output on leave/off day" |
@@ -100,7 +100,7 @@ Comment from Calendar View, Zoho Applied ?, Manager's Note.
 | Non-numeric value in a numeric process column | treated as 0 | issue (warning) with the raw value |
 | `Approval Status = Approved` but calendar status `Revert Leave` / "Leave Reverted" | **not** counted as leave | — |
 | Leave request with no matching calendar code (or vice versa) | — | issue (warning) "request/calendar mismatch" |
-| Resigned person still has an email (e.g. `dhanush.s` under *Resigned*) | treated as inactive | issue (info) |
+| Resigned person still has an email in Calendar View | treated as inactive | issue (info) |
 | Row 4 of Calendar View hard-codes 93 people | ignored; we compute from the roster | issue (info) |
 | Calendar headcount formula gives half-day **WL** 0 | app uses 0.5 (decision 23 Nov); the headcount reconciliation excludes this difference | issue (info) |
 
