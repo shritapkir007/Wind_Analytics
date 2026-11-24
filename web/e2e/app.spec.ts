@@ -51,6 +51,7 @@ test("create a task, change its status, see it overdue", async ({ page }) => {
   const title = `E2E task ${Date.now()}`;
   const dlg = page.getByRole("dialog");
   await dlg.getByLabel("Task description (title) *").fill(title);
+  await dlg.getByLabel("Details").fill("Keep this description");
   await dlg.getByLabel("Priority").selectOption("High");
   // due before assignment is rejected by validation
   await dlg.getByLabel("Due date").fill("2025-12-01");
@@ -66,6 +67,8 @@ test("create a task, change its status, see it overdue", async ({ page }) => {
   await page.waitForTimeout(800);
   await page.reload();
   await expect(page.locator("tr", { hasText: title }).getByText("Overdue")).toHaveCount(0);
+  // changing the status must not wipe other fields
+  await expect(page.locator("tr", { hasText: title })).toContainText("Keep this description");
 });
 
 test("manual sync from Data Sources", async ({ page }) => {
