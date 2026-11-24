@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           title: `Last successful sync: ${(lastGood ?? last).finishedAt}`,
         };
   return (
-    <Suspense>
+    <Suspense fallback={<p className="p-8 text-center text-[13px] text-muted">Loading Wind Ops…</p>}>
       <Shell user={user} sync={sync} alertCount={Number(alerts?.n ?? 0)}>
         {children}
       </Shell>
