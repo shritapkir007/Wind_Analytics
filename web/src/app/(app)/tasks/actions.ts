@@ -77,7 +77,10 @@ export async function updateTask(id: number, patch: Partial<z.input<typeof TaskI
     const [cur] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, id));
     if (!cur) return { ok: false, error: "Task not found" };
     const next: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(parsed.data)) if (v !== undefined && JSON.stringify((cur as Record<string, unknown>)[k]) !== JSON.stringify(v)) next[k] = v;
+    // Only fields actually sent are applied: zod fills defaults ("" / []) for missing ones,
+    // which must never overwrite the stored description, remarks or dependencies.
+    const sent = new Set(Object.keys(patch));
+    for (const [k, v] of Object.entries(parsed.data)) if (sent.has(k) && v !== undefined && JSON.stringify((cur as Record<string, unknown>)[k]) !== JSON.stringify(v)) next[k] = v;
     if (next.status === "Completed" && !cur.completedOn) next.completedOn = todayIST();
     if (next.status && next.status !== "Completed" && cur.completedOn) next.completedOn = null;
     if (!Object.keys(next).length) return { ok: true };
