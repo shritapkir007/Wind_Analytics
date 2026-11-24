@@ -16,7 +16,21 @@ async function connect(): Promise<DB> {
     const { migrate } = await import("drizzle-orm/postgres-js/migrator");
     const postgres = (await import("postgres")).default;
     // Supabase's transaction pooler (port 6543) does not support prepared statements.
-    const client = postgres(url, { prepare: false, max: Number(process.env.DB_POOL_MAX ?? 5) });
+    // Cloud databases get an encrypted connection unless the URL already sets sslmode.
+    const host = (() => {
+      try {
+        return new URL(url).hostname;
+      } catch {
+        throw new Error("DATABASE_URL is not a valid URL. Check for spaces, a leftover [YOUR-PASSWORD], or special characters in the password.");
+      }
+    })();
+    const local = ["localhost", "127.0.0.1", "::1"].includes(host);
+    const client = postgres(url, {
+      prepare: false,
+      max: Number(process.env.DB_POOL_MAX ?? 5),
+      connect_timeout: 15,
+      ...(local || /[?&]sslmode=/.test(url) ? {} : { ssl: "require" as const }),
+    });
     const db = drizzle(client, { schema });
     if (process.env.DB_AUTO_MIGRATE !== "0") await migrate(db, { migrationsFolder: MIGRATIONS });
     return db;
@@ -45,3 +59,27 @@ export function getDb(): Promise<DB> {
 }
 
 export { schema };
+
+/**
+ * Human-readable cause of a database error (drizzle wraps the driver error, which holds the
+ * useful part, e.g. "password authentication failed"). Never includes the connection string.
+ */
+export function describeDbError(e: unknown): string {
+  const parts: string[] = [];
+  let cur: unknown = e;
+  for (let i = 0; cur && i < 4; i++) {
+    const err = cur as { message?: string; code?: string; cause?: unknown };
+    if (err.message) parts.push(err.code ? `${err.message} (${err.code})` : err.message);
+    cur = err.cause;
+  }
+  const url = process.env.DATABASE_URL;
+  let text = parts.filter((p, i) => parts.indexOf(p) === i).join(" ← ");
+  if (url) {
+    text = text.split(url).join("[DATABASE_URL]");
+    try {
+      const pw = decodeURIComponent(new URL(url).password);
+      if (pw.length >= 4) text = text.split(pw).join("[password]");
+    } catch {}
+  }
+  return text.replace(/postgres(ql)?:\/\/[^\s"]+/g, "[connection string]");
+}
