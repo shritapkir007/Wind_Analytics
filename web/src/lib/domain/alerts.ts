@@ -29,10 +29,10 @@ export function computeAlerts(ds: Dataset, s: AppSettings, sync: { status: strin
 
   if (on("on_leave_today") || on("unplanned_absence")) {
     for (const r of dayStatus(ds, today)) {
-      if (on("unplanned_absence") && (r.status === "absent" || (r.status === "half_leave" && r.unplanned))) {
+      if (on("unplanned_absence") && r.status === "absent") {
         out.push({ key: `unplanned_absence|${r.employee.key}|${today}`, kind: "unplanned_absence", severity: "warning", subjectType: "employee", subjectId: r.employee.key, date: today, title: `${r.employee.name} — unplanned absence`, message: r.day?.category === "lop" ? "Marked LoP in Calendar View" : `Approved unplanned ${r.leaveType ?? "leave"} today` });
       } else if (on("on_leave_today") && (r.status === "leave" || r.status === "half_leave")) {
-        out.push({ key: `on_leave_today|${r.employee.key}|${today}`, kind: "on_leave_today", severity: "info", subjectType: "employee", subjectId: r.employee.key, date: today, title: `${r.employee.name} — on leave`, message: `${r.day?.rawCode} today` });
+        out.push({ key: `on_leave_today|${r.employee.key}|${today}`, kind: "on_leave_today", severity: "info", subjectType: "employee", subjectId: r.employee.key, date: today, title: `${r.employee.name} — on leave${r.unplanned ? " (unplanned)" : ""}`, message: `${r.day?.rawCode} today` });
       }
     }
   }

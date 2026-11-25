@@ -11,7 +11,7 @@ export const CAL_LEGEND: { key: string; label: string; color: string; code: stri
   { key: "leave", label: "Approved leave", color: "var(--cal-leave)", code: "L" },
   { key: "half_leave", label: "Half-day leave", color: "var(--cal-half)", code: "½" },
   { key: "pending", label: "Pending leave", color: "var(--cal-pending)", code: "P" },
-  { key: "absent", label: "Absent (LoP / unplanned)", color: "var(--cal-absent)", code: "A" },
+  { key: "absent", label: "Absent (LoP)", color: "var(--cal-absent)", code: "A" },
   { key: "week_off", label: "Week off", color: "var(--cal-off)", code: "" },
   { key: "holiday", label: "Holiday", color: "var(--cal-holiday)", code: "H" },
 ];
@@ -28,17 +28,11 @@ export function LeaveCalendar({ ds, people, from, to, linkQs }: { ds: Dataset; p
     if (!isPendingLeave(l) || !l.startDate || !l.endDate) continue;
     for (const d of eachDay(l.startDate < from ? from : l.startDate, l.endDate > to ? to : l.endDate)) pending.set(`${l.employeeKey}|${d}`, l.leaveType);
   }
-  const unplanned = new Set<string>();
-  for (const l of ds.leave) {
-    if (!l.effective || !/unplanned/i.test(l.requestKind) || !l.startDate || !l.endDate) continue;
-    for (const d of eachDay(l.startDate < from ? from : l.startDate, l.endDate > to ? to : l.endDate)) unplanned.add(`${l.employeeKey}|${d}`);
-  }
   const state = (k: string, d: string) => {
     const c = ds.calendar.get(`${k}|${d}`);
     if (!c) return null;
     if (c.category === "lop") return "absent";
     if ((c.category === "present" || c.category === "wfh") && pending.has(`${k}|${d}`)) return "pending";
-    if (c.category === "leave" && unplanned.has(`${k}|${d}`)) return "absent";
     if (c.category === "unknown") return "absent";
     return c.category;
   };

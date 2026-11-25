@@ -87,7 +87,7 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label={`Present · ${fmtDate(date)}`} value={fmtNum(hc.present, 1)} sub={`of ${hc.active} active · ${hc.wfh} WFH`} delta={{ ...change(hc.present, hcPrev.present), label: `vs ${fmtDate(prev)}` }} formula="Blank, Working or WFH = 1; half-day leave = 0.5 (Calendar View)." />
         <KpiCard label={`On leave · ${fmtDate(date)}`} value={fmtNum(hc.onLeave)} sub={`${hc.halfDay} half-day`} delta={{ ...change(hc.onLeave, hcPrev.onLeave), upIsGood: false, label: `vs ${fmtDate(prev)}` }} />
-        <KpiCard label={`Absent · ${fmtDate(date)}`} value={fmtNum(hc.absent)} tone={hc.absent ? "warning" : "default"} sub="LoP or approved unplanned" formula="LoP in Calendar View, or an approved Time Off – Unplanned request covering the day." />
+        <KpiCard label={`Absent · ${fmtDate(date)}`} value={fmtNum(hc.absent)} tone={hc.absent ? "warning" : "default"} sub={hc.unplannedLeave ? `LoP only · ${hc.unplannedLeave} on unplanned leave` : "LoP in Calendar View"} formula="People marked LoP in Calendar View. Unplanned leave counts as leave (shown with an Unplanned tag), not absence." />
         <KpiCard label="Attendance rate" value={fmtPct(sched ? (pres / sched) * 100 : null, 1)} sub={`${fmtNum(pres, 1)} of ${fmtNum(sched)} scheduled person-days`} delta={{ ...change(sched ? (pres / sched) * 100 : null, sPrev ? (pPrev / sPrev) * 100 : null), label: `vs ${fmtRange(cmp.from, cmp.to)}`, suffix: " pts" }} formula="Σ presence ÷ scheduled days (days that are not Week Off or Public Holiday), up to today." />
         <KpiCard label="Leave days taken" value={fmtNum(leaveDays, 1)} sub={fmtRange(v.from, v.to)} delta={{ ...change(leaveDays, leaveDaysPrev), upIsGood: false, label: `vs previous period` }} formula="Counted from Calendar View codes (half day = 0.5), not from request date ranges." />
         <KpiCard label="Leave requests in period" value={fmtNum(requests.length)} sub={`${requests.filter((r) => r.effective).length} approved & effective · ${requests.filter((r) => /unplanned/i.test(r.requestKind)).length} unplanned`} />
@@ -97,8 +97,8 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
 
       <div id="today" className="mb-4 grid gap-4 lg:grid-cols-4">
         {[
-          { t: "On leave", rows: group(["leave", "half_leave"]).filter((r) => !(r.status === "half_leave" && r.unplanned)), tone: "warning" as const },
-          { t: "Absent", rows: group(["absent"]).concat(status.filter((r) => r.status === "half_leave" && r.unplanned)), tone: "critical" as const },
+          { t: "On leave", rows: group(["leave", "half_leave"]), tone: "warning" as const },
+          { t: "Absent (LoP)", rows: group(["absent"]), tone: "critical" as const },
           { t: "Working from home", rows: group(["wfh"]), tone: "accent" as const },
           { t: `No output logged · ${fmtDate(prev)}`, rows: yesterday.filter((r) => (r.day?.presence ?? 0) > 0 && !r.outputLogged), tone: "neutral" as const },
         ].map((g) => (
@@ -114,7 +114,10 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
                       <Link className="truncate text-ink hover:text-accent" href={`/employees/${encodeURIComponent(r.employee.key)}${q({ employee: null })}`}>
                         {r.employee.name}
                       </Link>
-                      <Badge tone={g.tone}>{r.day?.rawCode || (r.unplanned ? "Unplanned" : r.status === "present" ? "Working" : r.status)}</Badge>
+                      <span className="flex shrink-0 items-center gap-1">
+                        {r.unplanned && <Badge dot={false}>Unplanned</Badge>}
+                        <Badge tone={g.tone}>{r.day?.rawCode || (r.status === "present" ? "Working" : r.status)}</Badge>
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -125,7 +128,7 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
       </div>
 
       <Card className="mb-4">
-        <CardHeader title={`Leave calendar · ${fmtMonth(calFrom)}`} subtitle="Hover a cell for the exact Calendar View code. Change the period to see another month." info="Each cell shows the Calendar View code for that day. 'Pending leave' marks requests in Leave Tracker that are not yet approved. 'Absent' covers LoP and approved unplanned leave." />
+        <CardHeader title={`Leave calendar · ${fmtMonth(calFrom)}`} subtitle="Hover a cell for the exact Calendar View code. Change the period to see another month." info="Each cell shows the Calendar View code for that day. 'Pending leave' marks requests in Leave Tracker that are not yet approved. 'Absent' is LoP; unplanned leave is shown as leave." />
         <CardBody>
           {people.length ? <LeaveCalendar ds={ds} people={people} from={calFrom} to={calTo} linkQs={q({ employee: null })} /> : <Empty title="No people in scope" />}
         </CardBody>

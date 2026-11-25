@@ -194,8 +194,9 @@ Notation: *d* = a date, *e* = employee, *p* = process. All periods are in IST.
   the day counts as a present working day (decision 25 Nov).
 * **Present today** = Σ presence_weight over active employees for today.
 * **On leave today** = count of active employees with a leave or half-leave code today.
-* **Absent today** = count with LoP **or** an approved *Time Off – Unplanned* request covering today
-  (these are not also counted in *On leave*).
+* **Absent today** = count with **LoP** in Calendar View. Unplanned leave (an approved
+  *Time Off – Unplanned* request) is **leave**, counted in *On leave* and tagged "Unplanned"
+  (decision 25 Nov).
   Without one of these, nobody is counted absent (a missing output entry is "no output logged",
   not absence).
 * **Scheduled days(e, period)** = days that are not `Week Off` / `Public Holiday`.
