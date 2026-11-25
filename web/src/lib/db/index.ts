@@ -28,7 +28,15 @@ async function connect(): Promise<DB> {
     const client = postgres(url, {
       prepare: false,
       max: Number(process.env.DB_POOL_MAX ?? 5),
+      // One query per connection at a time. postgres.js otherwise pipelines up to 100 queries
+      // on a busy connection, which Supabase's transaction pooler (Supavisor) can stall on.
+      ...({ max_pipeline: 1 } as Record<string, number>), // supported at runtime, missing from the type definitions
       connect_timeout: 15,
+      // Serverless: close idle connections quickly so a paused-then-resumed function never
+      // reuses a socket the pooler has already dropped.
+      idle_timeout: 20,
+      max_lifetime: 60 * 10,
+      onnotice: () => {},
       ...(local || /[?&]sslmode=/.test(url) ? {} : { ssl: "require" as const }),
     });
     const db = drizzle(client, { schema });
@@ -82,4 +90,26 @@ export function describeDbError(e: unknown): string {
     } catch {}
   }
   return text.replace(/postgres(ql)?:\/\/[^\s"]+/g, "[connection string]");
+}
+
+export class DbTimeoutError extends Error {
+  constructor(what: string, ms: number) {
+    super(`The database did not answer within ${Math.round(ms / 1000)} s (${what}). Check the Supabase project status and DATABASE_URL, then try again.`);
+    this.name = "DbTimeoutError";
+  }
+}
+
+/** Fail fast instead of letting a stuck query run into the platform's 300 s function limit. */
+export async function withDbTimeout<T>(p: Promise<T>, what: string, ms = Number(process.env.DB_QUERY_TIMEOUT_MS ?? 25_000)): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new DbTimeoutError(what, ms)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
