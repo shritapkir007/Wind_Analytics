@@ -320,7 +320,7 @@ const InventoryInput = z.object({
       duplicates: num.default(0),
       lateUploads: num.default(0),
       auditCount: num.default(0),
-      delivered: z.union([num, z.literal("")]).optional(),
+      delivered: z.union([z.literal(""), num]).optional(), // "" first: coerce would turn it into 0
     }),
   ),
 });
@@ -392,7 +392,7 @@ export async function setAttendance(employeeKey: string, date: string, code: str
 
 const EmployeeInput = z.object({
   originalKey: z.string().optional(),
-  name: z.string().trim().min(2).max(120),
+  name: z.string().trim().min(2, "Enter the full name").max(120),
   email: z.string().trim().toLowerCase().email(),
   role: z.string().trim().max(80).default(""),
   section: z.string().trim().min(1, "Choose a team").max(120),
@@ -412,9 +412,18 @@ export async function saveEmployee(input: z.input<typeof EmployeeInput>): Promis
     if (!email || !email.endsWith(`@${ALLOWED_DOMAIN}`)) throw new Error(`Use a @${ALLOWED_DOMAIN} email.`);
     if (v.leftOn && v.joinedOn && v.leftOn < v.joinedOn) throw new Error("The leaving date is before the joining date.");
     const db = await getDb();
-    if (v.originalKey && v.originalKey !== email) throw new Error("The email can't be changed. Add the person again with the new email and set an end date on the old record.");
+    // Records that came from the sheets may be keyed by name; an edit keeps the original key.
+    const key = v.originalKey || email;
+    if (v.originalKey) {
+      const [cur] = await db.select({ email: schema.employees.email }).from(schema.employees).where(eq(schema.employees.key, v.originalKey));
+      if (!cur) throw new Error("That person no longer exists.");
+      if (cur.email && cur.email !== email) throw new Error("The email can't be changed. Add the person again with the new email and set an end date on the old record.");
+    } else {
+      const [dupe] = await db.select({ key: schema.employees.key }).from(schema.employees).where(or(eq(schema.employees.key, email), eq(schema.employees.email, email)));
+      if (dupe) throw new Error("Someone with this email is already on the roster — edit them instead.");
+    }
     const row = {
-      key: email,
+      key,
       email,
       name: v.name,
       role: v.role,
@@ -429,8 +438,8 @@ export async function saveEmployee(input: z.input<typeof EmployeeInput>): Promis
     };
     const { key: _k, ...set } = row;
     await db.insert(schema.employees).values(row).onConflictDoUpdate({ target: schema.employees.key, set });
-    if ((await getDataMode()) === "app") await rebuildCalendar({ keys: [email] });
-    await audit(user.email, "employee", email, v.originalKey ? "updated" : "created", row);
+    if ((await getDataMode()) === "app") await rebuildCalendar({ keys: [key] });
+    await audit(user.email, "employee", key, v.originalKey ? "updated" : "created", row);
     await done(["/people"]);
     return { ok: true, message: `${v.name} saved` };
   } catch (e) {

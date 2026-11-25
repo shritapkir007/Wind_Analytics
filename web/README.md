@@ -90,6 +90,7 @@ Checks:
 npm test          # parser + KPI unit tests
 npm run typecheck
 npm run e2e       # browser tests (needs the fixture + AUTH_DEV_BYPASS=1)
+rm -rf .data/e2e-inapp && npx playwright test -c playwright.inapp.config.ts   # in-app entry flow, own DB
 ```
 
 ---
@@ -132,7 +133,24 @@ npm run e2e       # browser tests (needs the fixture + AUTH_DEV_BYPASS=1)
 ## 6. Roles
 | Role | Can |
 |---|---|
-| viewer | see every page, export reports |
-| lead | + create/update tasks, acknowledge alerts |
-| manager | + delete tasks, run a manual sync |
-| admin | + settings, thresholds, user roles |
+| viewer | see every page, export reports; log own output, leave/WFH and overtime (in-app mode) |
+| lead | + tasks, alerts; enter and approve for their own team, record inventory, mark attendance |
+| manager | + delete tasks, run a manual sync, approve for everyone, manage the roster |
+| admin | + settings, thresholds, user roles, holidays, targets, the go-live switch |
+
+## 7. In-app data entry (no sheets)
+
+The app can run on its own, without the Google Sheets. An admin switches it on in
+**Settings → Data entry** by typing `START FRESH`:
+
+- Kept: roster, teams, targets, users, tasks, settings. Deleted: all output, attendance, leave,
+  overtime and inventory history that came from the sheets. The sheet sync stops for good.
+- **My workspace** (everyone): daily output per process plus extra work, leave/WFH/working-day
+  requests, overtime. Leads can pick a team member and enter for them.
+- **Approvals** (leads for their team, managers for everyone; nobody approves themselves except
+  admins). Approved leave/WFH/working days and approved OT update the attendance calendar at once.
+- **Inventory** (leads): daily counts per stream; Delivered is calculated from FQC output unless typed.
+- **People & Teams** (managers): name, email, team, week offs, office/home, join and leave dates.
+- **Attendance** (leads): mark a day by hand (e.g. LoP); **Settings**: holidays and targets (admin).
+- The calendar is generated from all of the above; the hourly schedule keeps it rolling 120 days ahead.
+- Every change is in the activity log on **Data Sources**.

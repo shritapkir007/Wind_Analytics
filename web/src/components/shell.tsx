@@ -6,6 +6,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   BarChart3,
   Bell,
+  Boxes,
+  CheckCheck,
+  PencilLine,
+  UserCog,
   CalendarCheck2,
   ChevronsLeft,
   ChevronsRight,
@@ -23,21 +27,30 @@ import {
   X,
 } from "lucide-react";
 
-const NAV = [
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; show?: (n: NavInfo) => boolean };
+export type NavInfo = { mode: "sheets" | "app"; role: string; pending: number };
+const RANKS: Record<string, number> = { viewer: 0, lead: 1, manager: 2, admin: 3 };
+const atLeast = (n: NavInfo, r: string) => (RANKS[n.role] ?? 0) >= RANKS[r];
+
+const NAV: NavItem[] = [
+  { href: "/me", label: "My workspace", icon: PencilLine, show: (n) => n.mode === "app" },
+  { href: "/approvals", label: "Approvals", icon: CheckCheck, show: (n) => n.mode === "app" && atLeast(n, "lead") },
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/attendance", label: "Attendance & Leaves", icon: CalendarCheck2 },
   { href: "/output", label: "Output & Deliveries", icon: PackageCheck },
+  { href: "/inventory", label: "Inventory", icon: Boxes, show: (n) => n.mode === "app" && atLeast(n, "lead") },
   { href: "/tasks", label: "Task Management", icon: ListChecks },
   { href: "/employees", label: "Employee Performance", icon: Users },
   { href: "/reports", label: "Reports & Analytics", icon: BarChart3 },
   { href: "/alerts", label: "Alerts & Notifications", icon: Bell },
+  { href: "/people", label: "People & Teams", icon: UserCog, show: (n) => atLeast(n, "manager") },
   { href: "/data-sources", label: "Data Sources & Integrations", icon: Database },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 const KEEP = ["preset", "from", "to", "section", "employee"];
 
-function NavLinks({ collapsed, alertCount, onNavigate }: { collapsed: boolean; alertCount: number; onNavigate?: () => void }) {
+function NavLinks({ collapsed, alertCount, nav, onNavigate }: { collapsed: boolean; alertCount: number; nav: NavInfo; onNavigate?: () => void }) {
   const path = usePathname();
   const sp = useSearchParams();
   const keep = new URLSearchParams();
@@ -48,7 +61,7 @@ function NavLinks({ collapsed, alertCount, onNavigate }: { collapsed: boolean; a
   const q = keep.toString();
   return (
     <nav aria-label="Main" className="flex flex-col gap-0.5 px-2">
-      {NAV.map(({ href, label, icon: Icon }) => {
+      {NAV.filter((n) => !n.show || n.show(nav)).map(({ href, label, icon: Icon }) => {
         const active = path === href || path.startsWith(`${href}/`);
         return (
           <Link
@@ -62,6 +75,9 @@ function NavLinks({ collapsed, alertCount, onNavigate }: { collapsed: boolean; a
             {active && <span className="absolute top-2 bottom-2 left-0 w-[3px] rounded-r bg-[var(--s1)]" aria-hidden />}
             <Icon size={18} className="shrink-0" aria-hidden />
             {!collapsed && <span className="truncate">{label}</span>}
+            {href === "/approvals" && nav.pending > 0 && (
+              <span className={`tnum ml-auto rounded-full bg-warning px-1.5 text-[11px] leading-5 font-semibold text-ink ${collapsed ? "absolute top-1 right-1 px-1 text-[10px] leading-4" : ""}`}>{nav.pending > 99 ? "99+" : nav.pending}</span>
+            )}
             {href === "/alerts" && alertCount > 0 && (
               <span className={`tnum ml-auto rounded-full bg-critical px-1.5 text-[11px] leading-5 font-semibold text-white ${collapsed ? "absolute top-1 right-1 px-1 text-[10px] leading-4" : ""}`}>{alertCount > 99 ? "99+" : alertCount}</span>
             )}
@@ -93,11 +109,13 @@ export function Shell({
   user,
   sync,
   alertCount,
+  nav,
 }: {
   children: ReactNode;
   user: { name: string; email: string; role: string };
   sync: { label: string; tone: "good" | "warning" | "critical"; title: string };
   alertCount: number;
+  nav: NavInfo;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState(false);
@@ -138,7 +156,7 @@ export function Shell({
       <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col bg-sidebar transition-[width] duration-200 lg:flex ${collapsed ? "w-[68px]" : "w-[248px]"}`}>
         <Brand collapsed={collapsed} />
         <div className="flex-1 overflow-y-auto py-2">
-          <NavLinks collapsed={collapsed} alertCount={alertCount} />
+          <NavLinks collapsed={collapsed} alertCount={alertCount} nav={nav} />
         </div>
         <button type="button" onClick={toggleCollapsed} className="m-2 flex h-9 items-center gap-2 rounded-lg px-3 text-[12.5px] text-sidebar-ink hover:bg-sidebar-2 hover:text-white" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
           {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
@@ -157,7 +175,7 @@ export function Shell({
                 <X size={18} />
               </button>
             </div>
-            <NavLinks collapsed={false} alertCount={alertCount} onNavigate={() => setOpen(false)} />
+            <NavLinks collapsed={false} alertCount={alertCount} nav={nav} onNavigate={() => setOpen(false)} />
           </aside>
         </div>
       )}

@@ -168,7 +168,7 @@ describe("overtime, holidays, attendance and inventory", () => {
     as("asha@zeitview.com", "viewer");
     expect((await A.saveInventory({ date: "2026-11-25", rows: [{ stream: "External", uploaded: 5 }] })).error).toMatch(/lead/);
     as("lead.wind@zeitview.com", "lead");
-    expect(await A.saveInventory({ date: "2026-11-25", rows: [{ stream: "External", uploaded: 20, inventory: 250, qualityIssues: 30 }, { stream: "ZDT", uploaded: 3, inventory: 40, delivered: 7 }] })).toMatchObject({ ok: true });
+    expect(await A.saveInventory({ date: "2026-11-25", rows: [{ stream: "External", uploaded: 20, inventory: 250, qualityIssues: 30, delivered: "" }, { stream: "ZDT", uploaded: 3, inventory: 40, delivered: 7 }] })).toMatchObject({ ok: true });
     const ds = await getDataset();
     expect(ds.delivery.find((d) => d.stream === "External" && d.date === "2026-11-25")).toMatchObject({ delivered: 12, inventory: 250, uploaded: 20 });
     expect(ds.delivery.find((d) => d.stream === "ZDT" && d.date === "2026-11-25")).toMatchObject({ delivered: 7 });
@@ -179,5 +179,26 @@ describe("overtime, holidays, attendance and inventory", () => {
     const events = await db.select().from(schema.auditEvents);
     const kinds = new Set(events.map((e) => `${e.entity}:${e.action}`));
     for (const k of ["mode:switched", "output:created", "output:updated", "leave:requested", "leave:approved", "leave:cancelled", "overtime:approved", "holiday:saved", "attendance:set", "inventory:saved"]) expect(kinds).toContain(k);
+  });
+});
+
+describe("roster", () => {
+  it("adds people, refuses duplicates, and edits records that came from the sheets", async () => {
+    const db = await getDb();
+    await db.insert(schema.employees).values({ key: "name:ravi", email: null, name: "Ravi", role: "", section: "Wind Team", isActive: true, employeeCode: null, hash: "" });
+    as("lead.wind@zeitview.com", "lead");
+    expect((await A.saveEmployee({ name: "New", email: "new@zeitview.com", section: "Wind Team" })).error).toMatch(/manager/);
+    as("admin@zeitview.com", "admin");
+    expect(await A.saveEmployee({ name: "New Person", email: "new@zeitview.com", section: "Wind Team", weekOff: [0], workLocation: "wfh" })).toMatchObject({ ok: true });
+    expect((await A.saveEmployee({ name: "Again", email: "new@zeitview.com", section: "Wind Team" })).error).toMatch(/already on the roster/);
+    expect((await A.saveEmployee({ name: "Xavier", email: "x@gmail.com", section: "Wind Team" })).error).toMatch(/@zeitview.com/);
+    // a sheet-era record keyed by name keeps its key when an email is added
+    expect(await A.saveEmployee({ originalKey: "name:ravi", name: "Ravi K", email: "ravi@zeitview.com", section: "Wind Team" })).toMatchObject({ ok: true });
+    const [ravi] = await db.select().from(schema.employees).where(eq(schema.employees.key, "name:ravi"));
+    expect(ravi).toMatchObject({ name: "Ravi K", email: "ravi@zeitview.com" });
+    expect((await A.saveEmployee({ originalKey: "name:ravi", name: "Ravi K", email: "other@zeitview.com", section: "Wind Team" })).error).toMatch(/can't be changed/);
+    // Saturday is a working day for the new WFH person (only Sunday off)
+    const [sat] = await db.select().from(schema.calendarDays).where(and(eq(schema.calendarDays.employeeKey, "new@zeitview.com"), eq(schema.calendarDays.date, "2026-11-28")));
+    expect(sat).toMatchObject({ rawCode: "WFH" });
   });
 });
