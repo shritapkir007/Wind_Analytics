@@ -1,6 +1,6 @@
 import "server-only";
 import { desc, inArray } from "drizzle-orm";
-import { getDb, schema } from "../db";
+import { getDb, schema, withDbTimeout } from "../db";
 import { todayIST } from "../config";
 import { buildDataset, RANKING_RULES, type Dataset, type Task } from "./metrics";
 import { getSettings } from "./settings";
@@ -21,8 +21,8 @@ async function latestGoodRunId(): Promise<number | null> {
 }
 
 async function loadBase(runId: number | null, today: string): Promise<Cached> {
-  const db = await getDb();
-  const [employees, subs, cal, leave, delivery, targets, overtime, refs] = await Promise.all([
+  const db = await withDbTimeout(getDb(), "connecting");
+  const [employees, subs, cal, leave, delivery, targets, overtime, refs] = await withDbTimeout(Promise.all([
     db.select().from(schema.employees),
     db.select().from(schema.outputSubmissions),
     db.select().from(schema.calendarDays),
@@ -31,7 +31,7 @@ async function loadBase(runId: number | null, today: string): Promise<Cached> {
     db.select().from(schema.targets),
     db.select().from(schema.overtimeEntries),
     db.select().from(schema.referenceValues),
-  ]);
+  ]), "loading dashboard data", 60_000);
   return {
     runId,
     today,
@@ -60,13 +60,13 @@ export async function loadTasks(): Promise<Task[]> {
  */
 export async function getDataset(): Promise<Dataset> {
   const today = todayIST();
-  const runId = await latestGoodRunId();
+  const runId = await withDbTimeout(latestGoodRunId(), "reading the sync status");
   let c = g.__windData;
   if (!c || c.runId !== runId || c.today !== today) {
     if (!g.__windLoading) g.__windLoading = loadBase(runId, today).finally(() => (g.__windLoading = undefined));
     c = g.__windData = await g.__windLoading;
   }
-  const [tasks, settings] = await Promise.all([loadTasks(), getSettings()]);
+  const [tasks, settings] = await withDbTimeout(Promise.all([loadTasks(), getSettings()]), "loading tasks and settings");
   RANKING_RULES.minCoveragePct = settings.ranking.minCoveragePct;
   RANKING_RULES.minPresentDays = settings.ranking.minPresentDays;
   return buildDataset({ ...c.base, today, tasks });

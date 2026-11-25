@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { count, desc, isNull } from "drizzle-orm";
 import { Shell } from "@/components/shell";
 import { currentUser } from "@/auth";
-import { getDb, schema } from "@/lib/db";
+import { getDb, schema, withDbTimeout } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +16,11 @@ function ago(iso: string) {
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
-  const db = await getDb();
-  const [runs, [alerts]] = await Promise.all([
+  const db = await withDbTimeout(getDb(), "connecting");
+  const [runs, [alerts]] = await withDbTimeout(Promise.all([
     db.select().from(schema.syncRuns).orderBy(desc(schema.syncRuns.id)).limit(10),
     db.select({ n: count() }).from(schema.alerts).where(isNull(schema.alerts.resolvedAt)),
-  ]);
+  ]), "loading the sync status");
   const last = runs[0];
   const lastGood = runs.find((r) => r.status === "success" || r.status === "partial");
   const sync = !last
