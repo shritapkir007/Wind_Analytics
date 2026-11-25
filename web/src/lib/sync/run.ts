@@ -7,6 +7,7 @@ import { collect } from "./collect";
 import { reconcile } from "./reconcile";
 import { applyDiff, type DiffStats } from "./apply";
 import { refreshAlerts } from "../domain/alerts";
+import { getDataMode, rebuildCalendar } from "../entry/store";
 
 export interface SyncResult {
   runId: number;
@@ -26,6 +27,27 @@ export async function runSync(opts: {
 }): Promise<SyncResult> {
   const db = await getDb();
   const started = nowIso();
+
+  // In-app data entry: the sheets are no longer read. The schedule keeps the generated
+  // attendance calendar rolling forward (120 days ahead) and refreshes alerts instead.
+  if ((await getDataMode(db)) === "app") {
+    const [run] = await db.insert(schema.syncRuns).values({ mode: opts.mode, trigger: opts.trigger, triggeredBy: opts.triggeredBy ?? null, startedAt: started, status: "running" }).returning({ id: schema.syncRuns.id });
+    try {
+      const n = await rebuildCalendar({}, db);
+      const stats = { calendar: { read: n, inserted: n, updated: 0, deleted: 0 } };
+      await db.update(schema.syncRuns).set({ status: "success", finishedAt: nowIso(), stats, error: null }).where(eq(schema.syncRuns.id, run.id));
+      try {
+        await refreshAlerts();
+      } catch (e) {
+        console.error("alert refresh failed", e);
+      }
+      return { runId: run.id, status: "success", stats, issues: 0 };
+    } catch (e) {
+      const msg = shortDbError(e);
+      await db.update(schema.syncRuns).set({ status: "failed", finishedAt: nowIso(), error: msg }).where(eq(schema.syncRuns.id, run.id));
+      return { runId: run.id, status: "failed", stats: {}, issues: 0, error: msg };
+    }
+  }
 
   // Single-flight: skip if another run started in the last 10 minutes and is still running.
   const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();

@@ -56,6 +56,7 @@ export default async function Settings() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Num name="minCoveragePct" label="Minimum target coverage" value={s.ranking.minCoveragePct} suffix="%" hint="Share of output in processes that have a target" />
                 <Num name="minPresentDays" label="Minimum present days" value={s.ranking.minPresentDays} suffix="days" />
+                <Num name="selfEditDays" label="People can edit their own output for" value={s.entry.selfEditDays} suffix="past days" hint="In-app data entry: older days need a lead" />
               </div>
             </CardBody>
           </Card>
