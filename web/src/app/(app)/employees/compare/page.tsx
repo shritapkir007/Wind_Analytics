@@ -9,6 +9,7 @@ import { diffDays, fmtDate, fmtMonth, fmtRange } from "@/lib/domain/dates";
 import { fmtNum, fmtPct, qs, type SP } from "@/lib/view";
 import { FormulaCard } from "@/components/formula-card";
 
+import { teamLabel } from "@/lib/teams";
 export const dynamic = "force-dynamic";
 const COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
 
@@ -25,7 +26,7 @@ export default async function Compare({ searchParams }: { searchParams: Promise<
   const all = ds.employees.filter((e) => e.isActive).sort((a, b) => a.name.localeCompare(b.name));
 
   const rows: [string, (p: (typeof perf)[number]) => string, string?][] = [
-    ["Team", (p) => p.employee.section],
+    ["Team", (p) => teamLabel(p.employee.section)],
     ["Role", (p) => p.employee.role],
     ["Present days", (p) => fmtNum(p.attendance.presentDays, 1)],
     ["Attendance", (p) => fmtPct(p.attendance.attendancePct, 1)],

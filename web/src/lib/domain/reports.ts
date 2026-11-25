@@ -15,6 +15,7 @@ import {
   type Dataset,
   type Filter,
 } from "./metrics";
+import { inTeamScope, teamLabel, teamOf, teamTree } from "../teams";
 import { addDays, eachDay, fmtDate, fmtRange, monthEnd, monthStart, previousPeriod, weekStart } from "./dates";
 
 export type ReportKind = "daily" | "weekly" | "monthly" | "custom";
@@ -77,7 +78,7 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
   const del = deliverySummary(ds, range);
   const perf = teamPerformance(ds, f);
   const emps = employeesInScope(ds, scope);
-  const tasks = ds.tasks.filter((t) => (!scope.employee || t.assigneeKey === scope.employee) && (!scope.section || (t.assigneeKey && ds.emp.get(t.assigneeKey)?.section === scope.section)));
+  const tasks = ds.tasks.filter((t) => (!scope.employee || t.assigneeKey === scope.employee) && (!scope.section || (Boolean(t.assigneeKey) && inTeamScope(ds.emp.get(t.assigneeKey!), scope.section))));
   const overdue = tasks.filter((t) => isOverdue(t, ds.today < range.to ? ds.today : range.to));
   const completed = tasks.filter((t) => t.completedOn && t.completedOn >= range.from && t.completedOn <= range.to);
   const name = (k: string) => ds.emp.get(k)?.name ?? k;
@@ -124,12 +125,12 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
     rep.tables.push({
       title: "Leave & absence",
       columns: ["Employee", "Team", "Status", "Code"],
-      rows: st.filter((r) => ["leave", "half_leave", "absent"].includes(r.status)).map((r) => [r.employee.name, r.employee.section, r.status === "absent" ? "Absent (LoP)" : `${r.status === "half_leave" ? "Half-day leave" : "On leave"}${r.unplanned ? " · unplanned" : ""}`, r.day?.rawCode ?? ""]),
+      rows: st.filter((r) => ["leave", "half_leave", "absent"].includes(r.status)).map((r) => [r.employee.name, teamLabel(r.employee.section), r.status === "absent" ? "Absent (LoP)" : `${r.status === "half_leave" ? "Half-day leave" : "On leave"}${r.unplanned ? " · unplanned" : ""}`, r.day?.rawCode ?? ""]),
     });
     rep.tables.push({
       title: "Present but no output logged",
       columns: ["Employee", "Team", "Calendar"],
-      rows: st.filter((r) => (r.day?.presence ?? 0) > 0 && !r.outputLogged).map((r) => [r.employee.name, r.employee.section, r.day?.rawCode || "Working"]),
+      rows: st.filter((r) => (r.day?.presence ?? 0) > 0 && !r.outputLogged).map((r) => [r.employee.name, teamLabel(r.employee.section), r.day?.rawCode || "Working"]),
     });
   }
 
@@ -141,7 +142,7 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
       .map((p) => [
         p.rank,
         p.employee.name,
-        p.employee.section,
+        teamLabel(p.employee.section),
         r1(p.attendance.presentDays),
         r2(p.output.totalSteps),
         r2(p.output.targetDays),
@@ -175,16 +176,22 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
       columns: ["Period", "Output (steps)", "Target-days", "Present days", "Productivity"],
       rows: series.map((s) => [kind === "monthly" ? `Week of ${fmtDate(s.bucket)}` : fmtDate(s.bucket), r2(s.total), r2(s.targetDays), r1(s.presentDays), pct(s.productivityPct)]),
     });
-    const sections = [...new Set(emps.map((e) => e.section))];
+    const row = (label: string, members: typeof emps) => {
+      const a = members.map((e) => attendanceFor(ds, e.key, range));
+      const sc = a.reduce((x, y) => x + y.scheduledDays, 0);
+      const pr = a.reduce((x, y) => x + y.presentDays, 0);
+      return [label, a.length, sc, r1(pr), pct(sc ? (pr / sc) * 100 : null), r1(a.reduce((x, y) => x + y.leaveDays, 0)), a.reduce((x, y) => x + y.lopDays, 0)];
+    };
+    const tree = teamTree(emps);
     rep.tables.push({
       title: "Attendance & leave by team",
-      columns: ["Team", "People", "Scheduled days", "Present days", "Attendance", "Leave days", "LoP"],
-      rows: sections.map((s) => {
-        const a = emps.filter((e) => e.section === s).map((e) => attendanceFor(ds, e.key, range));
-        const sc = a.reduce((x, y) => x + y.scheduledDays, 0);
-        const pr = a.reduce((x, y) => x + y.presentDays, 0);
-        return [s, a.length, sc, r1(pr), pct(sc ? (pr / sc) * 100 : null), r1(a.reduce((x, y) => x + y.leaveDays, 0)), a.reduce((x, y) => x + y.lopDays, 0)];
+      columns: ["Team / sub-team", "People", "Scheduled days", "Present days", "Attendance", "Leave days", "LoP"],
+      rows: tree.flatMap((g) => {
+        const teamRow = row(g.team, emps.filter((e) => inTeamScope(e, g.team)));
+        if (g.subTeams.length === 1 && g.subTeams[0] === g.team) return [teamRow];
+        return [teamRow, ...g.subTeams.map((st) => row(`   ${st}`, emps.filter((e) => teamOf(e.section).subTeam === st)))];
       }),
+      note: "Team rows include all their sub-teams.",
     });
   }
 

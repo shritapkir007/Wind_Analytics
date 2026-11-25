@@ -8,6 +8,7 @@ import { fmtPct, qs, type SP } from "@/lib/view";
 import { Scale } from "lucide-react";
 import { FormulaCard } from "@/components/formula-card";
 
+import { teamLabel } from "@/lib/teams";
 export const dynamic = "force-dynamic";
 
 export default async function Employees({ searchParams }: { searchParams: Promise<SP> }) {
@@ -53,7 +54,7 @@ export default async function Employees({ searchParams }: { searchParams: Promis
               return {
                 rank: { v: p.rank, label: p.rank ? `#${p.rank}` : "—" },
                 name: { v: p.employee.name, href: `/employees/${encodeURIComponent(p.employee.key)}${qs(sp, { employee: null })}` },
-                section: p.employee.section,
+                section: teamLabel(p.employee.section),
                 role: p.employee.role,
                 code: p.employee.employeeCode,
                 present: p.attendance.presentDays,

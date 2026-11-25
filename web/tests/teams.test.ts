@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import { inTeamScope, teamLabel, teamOf, teamTree } from "@/lib/teams";
+
+const emp = (section: string) => ({ key: section, email: null, name: section, role: "", section, isActive: true, employeeCode: null });
+
+describe("team structure (decision 25 Nov)", () => {
+  it("maps Calendar View sections to teams and sub-teams", () => {
+    expect(teamOf("Wind Team")).toMatchObject({ team: "Wind Team", subTeam: "Wind Team (core)" });
+    expect(teamOf("Data Process ")).toMatchObject({ team: "Wind Team", subTeam: "Data Process" });
+    expect(teamOf("WFH")).toMatchObject({ team: "Wind Team", subTeam: "WFH" });
+    expect(teamOf("GWO ")).toMatchObject({ team: "Wind Team", subTeam: "GWO (Field operations)" });
+    expect(teamOf("LM Blade Pilot ")).toMatchObject({ team: "Wind Team", subTeam: "LM Blade Pilot" });
+    expect(teamOf("Properties-Wind-Utilities Cross Vertical")).toMatchObject({ team: "Properties-Wind-Utilities Cross Vertical" });
+    expect(teamOf("Encord Project")).toMatchObject({ team: "Encord Team" });
+    expect(teamOf("Brand New Section")).toMatchObject({ team: "Brand New Section", subTeam: "Brand New Section" });
+  });
+
+  it("filters by a whole team or a single sub-team", () => {
+    expect(inTeamScope(emp("WFH"), "Wind Team")).toBe(true);
+    expect(inTeamScope(emp("GWO "), "Wind Team")).toBe(true);
+    expect(inTeamScope(emp("WFH"), "WFH")).toBe(true);
+    expect(inTeamScope(emp("WFH"), "Data Process")).toBe(false);
+    expect(inTeamScope(emp("Encord Project"), "Wind Team")).toBe(false);
+    expect(inTeamScope(emp("Encord Project"), "Encord Team")).toBe(true);
+    expect(inTeamScope(emp("Encord Project"), undefined)).toBe(true);
+  });
+
+  it("builds the tree in a stable order and labels people", () => {
+    const tree = teamTree(["Encord Project", "WFH", "Wind Team", "Data Process ", "GWO ", "Properties-Wind-Utilities Cross Vertical"].map(emp));
+    expect(tree).toEqual([
+      { team: "Wind Team", subTeams: ["Wind Team (core)", "Data Process", "WFH", "GWO (Field operations)"] },
+      { team: "Properties-Wind-Utilities Cross Vertical", subTeams: ["Properties-Wind-Utilities Cross Vertical"] },
+      { team: "Encord Team", subTeams: ["Encord Team"] },
+    ]);
+    expect(teamLabel("Data Process ")).toBe("Wind Team · Data Process");
+    expect(teamLabel("Encord Project")).toBe("Encord Team");
+  });
+});

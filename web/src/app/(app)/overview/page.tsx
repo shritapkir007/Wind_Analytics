@@ -24,6 +24,7 @@ import { FAMILIES } from "@/lib/processes";
 import { FAMILY_COLOR, fmtNum, fmtPct, qs, STREAM_COLOR, type SP } from "@/lib/view";
 import { getDb, schema } from "@/lib/db";
 
+import { teamTree } from "@/lib/teams";
 export const dynamic = "force-dynamic";
 
 export default async function Overview({ searchParams }: { searchParams: Promise<SP> }) {
@@ -118,7 +119,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
       {/* Today */}
       <h2 className="mb-2 text-[12px] font-semibold tracking-wide text-muted uppercase">People today</h2>
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Total active employees" value={fmtNum(active)} sub={`${new Set(employeesInScope(ds, scope).map((e) => e.section)).size} teams · Calendar View roster`} href={`/employees${q({})}`} formula="People listed in Calendar View with an email, excluding the Resigned and Department Changed sections." />
+        <KpiCard label="Total active employees" value={fmtNum(active)} sub={`${teamTree(employeesInScope(ds, scope)).length} teams · Calendar View roster`} href={`/employees${q({})}`} formula="People listed in Calendar View with an email, excluding the Resigned and Department Changed sections." />
         <KpiCard label="Present today" value={fmtNum(hc.present, 1)} sub={`${hc.wfh} WFH · ${hc.halfDay} half-day`} delta={{ ...change(hc.present, hcPrev.present), label: `vs ${fmtDate(prevDay)}` }} href={`/attendance${q({ preset: "today" })}`} formula="Same rule as the sheet's Headcount/Day row: blank, Working or WFH = 1; any half-day leave = 0.5. Week Off and Public Holiday are not working days." />
         <KpiCard label="On leave today" value={fmtNum(hc.onLeave)} sub={hc.weekOff || hc.holiday ? `${hc.weekOff} week off · ${hc.holiday} holiday` : "Planned leave codes in Calendar View"} delta={{ ...change(hc.onLeave, hcPrev.onLeave), upIsGood: false, label: `vs ${fmtDate(prevDay)}` }} href={`/attendance${q({ preset: "today" })}#today`} formula="People with a full or half-day leave code (EL, CL, WL, PL, EL CF, Comp Off, Bereavement, Leave) today, planned or unplanned." />
         <KpiCard label="Absent today" value={fmtNum(hc.absent)} sub="LoP in Calendar View" tone={hc.absent > 0 ? "warning" : "default"} delta={{ ...change(hc.absent, hcPrev.absent), upIsGood: false, label: `vs ${fmtDate(prevDay)}` }} href={`/attendance${q({ preset: "today" })}#today`} formula="People marked LoP in Calendar View today. Unplanned leave (an approved 'Time Off – Unplanned' request) counts as leave, not absence. A missing output entry is never counted as absence." />

@@ -5,6 +5,7 @@ import { Badge, Card, CardBody, CardHeader, Empty, KpiCard, PageHeader } from "@
 import { ColumnChart, LineTrend } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
 import { isWorkingRequest } from "@/lib/sheets/parsers/leave";
+import { inTeamScope, teamLabel, teamOf, teamTree } from "@/lib/teams";
 import { LeaveCalendar } from "@/components/leave-calendar";
 import {
   attendanceFor,
@@ -30,7 +31,7 @@ const LEAVE_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(-
 export default async function Attendance({ searchParams }: { searchParams: Promise<SP> }) {
   const { ds, sp, v, filter, barProps } = await loadPage(searchParams);
   const scope = { section: v.section, employee: v.employee };
-  const people = employeesInScope(ds, scope).sort((a, b) => a.section.localeCompare(b.section) || a.name.localeCompare(b.name));
+  const people = employeesInScope(ds, scope).sort((a, b) => teamOf(a.section).order - teamOf(b.section).order || a.name.localeCompare(b.name));
   const date = v.preset === "today" || v.from === v.to ? v.to : ds.today;
   const hc = headcount(ds, date, scope);
   const prev = previousWorkingDay(ds, date);
@@ -48,7 +49,7 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
   const leaveDays = att.reduce((s, x) => s + x.a.leaveDays, 0);
   const leaveDaysPrev = attPrev.reduce((s, x) => s + x.leaveDays, 0);
   const requests = leaveRequestsInRange(ds, filter);
-  const pendingAll = ds.leave.filter((l) => isPendingLeave(l) && (!v.employee || l.employeeKey === v.employee) && (!v.section || ds.emp.get(l.employeeKey)?.section === v.section));
+  const pendingAll = ds.leave.filter((l) => isPendingLeave(l) && (!v.employee || l.employeeKey === v.employee) && inTeamScope(ds.emp.get(l.employeeKey), v.section));
   const upcoming = upcomingLeave(ds, scope, 30);
 
   // calendar month = month containing the period end
@@ -65,15 +66,19 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
   for (let mo = 1; mo <= Number(ds.today.slice(5, 7)); mo++) monthList.push(`${ds.today.slice(0, 4)}-${String(mo).padStart(2, "0")}-01`);
   const byTypeMonth = LEAVE_TYPES.map((t) => monthList.map((m) => people.reduce((s, e) => s + (attendanceFor(ds, e.key, { from: m, to: monthEnd(m) }).byLeaveType[t] ?? 0), 0)));
 
-  // team distribution
-  const sections = [...new Set(people.map((p) => p.section))];
-  const teamRows = sections.map((sec) => {
-    const rows = att.filter((x) => x.e.section === sec);
+  // team distribution: team rows (all sub-teams) followed by their sub-teams
+  const sumRows = (label: string, rows: typeof att, level: 0 | 1) => {
     const s = rows.reduce((a, x) => a + x.a.scheduledDays, 0);
     const p = rows.reduce((a, x) => a + x.a.presentDays, 0);
     const byType: Record<string, number> = {};
     for (const x of rows) for (const [k, n] of Object.entries(x.a.byLeaveType)) byType[k] = (byType[k] ?? 0) + n;
-    return { sec, people: rows.length, s, p, byType, leave: rows.reduce((a, x) => a + x.a.leaveDays, 0), lop: rows.reduce((a, x) => a + x.a.lopDays, 0) };
+    const other = Object.entries(byType).filter(([k]) => !LEAVE_TYPES.includes(k)).reduce((a, [, n]) => a + n, 0);
+    return { label, level, people: rows.length, s, p, byType, other, leave: rows.reduce((a, x) => a + x.a.leaveDays, 0), lop: rows.reduce((a, x) => a + x.a.lopDays, 0) };
+  };
+  const teamRows = teamTree(people).flatMap((g) => {
+    const teamRow = sumRows(g.team, att.filter((x) => inTeamScope(x.e, g.team)), 0);
+    if (g.subTeams.length === 1 && g.subTeams[0] === g.team) return [teamRow];
+    return [teamRow, ...g.subTeams.map((st) => sumRows(st, att.filter((x) => teamOf(x.e.section).subTeam === st), 1))];
   });
 
   const q = (o: Record<string, string | null> = {}) => qs(sp, o);
@@ -152,26 +157,40 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
       <Card className="mb-4">
         <CardHeader title="Team-wise leave distribution" subtitle={fmtRange(v.from, v.to)} />
         <CardBody>
-          <DataTable
-            searchable={false}
-            filename="team-leave-distribution"
-            columns={[
-              { key: "sec", header: "Team / section" },
-              { key: "people", header: "People", align: "right" },
-              { key: "att", header: "Attendance", align: "right" },
-              ...LEAVE_TYPES.map((t) => ({ key: t, header: t, align: "right" as const })),
-              { key: "lop", header: "LoP", align: "right" },
-              { key: "leave", header: "Total leave days", align: "right" },
-            ]}
-            rows={teamRows.map((r) => ({
-              sec: r.sec,
-              people: r.people,
-              att: { v: r.s ? (r.p / r.s) * 100 : null, label: fmtPct(r.s ? (r.p / r.s) * 100 : null, 1) },
-              ...Object.fromEntries(LEAVE_TYPES.map((t) => [t, r.byType[t] ?? 0])),
-              lop: r.lop,
-              leave: r.leave,
-            }))}
-          />
+          <div className="overflow-x-auto rounded-xl border border-line">
+            <table className="w-full text-[13px]">
+              <thead className="bg-surface-2 text-[12px] text-ink-2">
+                <tr>
+                  <th scope="col" className="px-3 py-2 text-left font-medium">Team / sub-team</th>
+                  {["People", "Attendance", ...LEAVE_TYPES, "Other", "LoP", "Total leave days"].map((h) => (
+                    <th key={h} scope="col" className="px-3 py-2 text-right font-medium whitespace-nowrap" title={h === "Other" ? "Bereavement, Leave and any other named leave type" : undefined}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {teamRows.map((r) => (
+                  <tr key={`${r.level}-${r.label}`} className={`border-t border-line ${r.level === 0 ? "bg-surface-2/50 font-semibold text-ink" : "text-ink-2"}`}>
+                    <th scope="row" className={`py-2 pr-3 text-left ${r.level === 0 ? "pl-3 font-semibold" : "pl-8 font-normal"}`}>
+                      {r.label}
+                    </th>
+                    <td className="tnum px-3 py-2 text-right">{r.people}</td>
+                    <td className="tnum px-3 py-2 text-right">{fmtPct(r.s ? (r.p / r.s) * 100 : null, 1)}</td>
+                    {LEAVE_TYPES.map((t) => (
+                      <td key={t} className="tnum px-3 py-2 text-right">
+                        {fmtNum(r.byType[t] ?? 0, 1)}
+                      </td>
+                    ))}
+                    <td className="tnum px-3 py-2 text-right">{fmtNum(r.other, 1)}</td>
+                    <td className="tnum px-3 py-2 text-right">{r.lop}</td>
+                    <td className="tnum px-3 py-2 text-right">{fmtNum(r.leave, 1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[12px] text-muted">Team rows include all their sub-teams.</p>
         </CardBody>
       </Card>
 
@@ -193,7 +212,7 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
             ]}
             rows={att.map(({ e, a }) => ({
               name: { v: e.name, href: `/employees/${encodeURIComponent(e.key)}${q({ employee: null })}` },
-              section: e.section,
+              section: teamLabel(e.section),
               sched: a.scheduledDays,
               present: a.presentDays,
               pct: { v: a.attendancePct, label: fmtPct(a.attendancePct, 1), tone: a.attendancePct != null && a.attendancePct < 80 ? "critical" : undefined },

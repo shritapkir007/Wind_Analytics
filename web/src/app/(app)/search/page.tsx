@@ -6,6 +6,7 @@ import { parseDayFirst } from "@/lib/sheets/normalize";
 import { isOverdue } from "@/lib/domain/metrics";
 import type { SP } from "@/lib/view";
 
+import { teamLabel } from "@/lib/teams";
 export const dynamic = "force-dynamic";
 
 export default async function Search({ searchParams }: { searchParams: Promise<SP> }) {
@@ -15,7 +16,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<S
   const ql = q.toLowerCase();
   const has = (s: string | null | undefined) => Boolean(s && s.toLowerCase().includes(ql));
 
-  const people = q ? ds.employees.filter((e) => has(e.name) || has(e.email) || has(e.employeeCode) || has(e.role) || has(e.section)).slice(0, 30) : [];
+  const people = q ? ds.employees.filter((e) => has(e.name) || has(e.email) || has(e.employeeCode) || has(e.role) || has(teamLabel(e.section))).slice(0, 30) : [];
   const taskId = ql.match(/^tsk-?0*(\d+)$/)?.[1];
   const tasks = q ? ds.tasks.filter((t) => (taskId ? String(t.id) === taskId : has(t.title) || has(t.project) || has(t.description) || has(t.process))).slice(0, 30) : [];
   const leave = q ? ds.leave.filter((l) => l.workflowId === q || has(l.leaveType) && q.length >= 2 && l.leaveType.toLowerCase() === ql).slice(0, 50) : [];
@@ -57,7 +58,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<S
                     </Link>
                     <span className="flex gap-1">
                       {e.employeeCode && <Badge dot={false}>{e.employeeCode}</Badge>}
-                      <Badge dot={false}>{e.section}</Badge>
+                      <Badge dot={false}>{teamLabel(e.section)}</Badge>
                     </span>
                   </li>
                 ))}
