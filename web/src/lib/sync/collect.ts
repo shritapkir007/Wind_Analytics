@@ -21,6 +21,7 @@ import { parseLeaveDashboard, parseLeaveTracker, parseTrackerIds } from "../shee
 import { parseActiveZv, parseEmployeeList, parsePivot, parseTargets } from "../sheets/parsers/workstudyOther";
 import { parseEmployeeIds, parseOvertime } from "../sheets/parsers/overtime";
 import { PROCESSES } from "../processes";
+import { applyWorkingRequests, fuzzyNameLookup, linkNamelessRows } from "./identity";
 
 export interface Snapshot {
   employees?: Employee[];
@@ -140,6 +141,19 @@ export async function collect(source: SheetSource, mode: "quick" | "full"): Prom
     const extraKeys = new Set<string>();
     for (const s of snap.submissions ?? []) if (!byKey.has(s.employeeKey)) extraKeys.add(s.employeeKey);
     for (const l of snap.leave ?? []) if (!byKey.has(l.employeeKey)) extraKeys.add(l.employeeKey);
+
+    // Roster rows listed by name only (e.g. "Resigned/Layed OFF People") are linked to the email
+    // their output / leave uses, when exactly one email matches the name.
+    const nameless = [...byKey.values()].filter((e) => !e.email).map((e) => ({ key: e.key, name: e.name }));
+    const links = linkNamelessRows(nameless, [...extraKeys]);
+    for (const [oldKey, email] of links) {
+      const e = byKey.get(oldKey)!;
+      byKey.delete(oldKey);
+      byKey.set(email, { ...e, key: email, email, employeeCode: ids?.find((i) => i.email === email)?.code ?? e.employeeCode });
+      for (const d of snap.calendar ?? []) if (d.employeeKey === oldKey) d.employeeKey = email;
+      extraKeys.delete(email);
+      snap.issues.push({ source: "leave", tab: "Calendar View", rowRef: e.name, severity: "info", code: "linked_by_name", message: `"${e.name}" (no email in Calendar View, section "${e.section}") linked to ${email} by name` });
+    }
     for (const k of extraKeys) {
       const code = ids?.find((i) => i.email === k);
       byKey.set(k, {
@@ -156,6 +170,12 @@ export async function collect(source: SheetSource, mode: "quick" | "full"): Prom
     snap.employees = [...byKey.values()];
   }
 
+  // ---- Approved "Working" requests turn that Week Off / holiday into a working day ----
+  if (snap.calendar && snap.leave) {
+    const n = applyWorkingRequests(snap.calendar, snap.leave);
+    if (n) snap.issues.push({ source: "leave", tab: "Calendar View", rowRef: "summary", severity: "info", code: "working_requests_applied", message: `${n} Week Off / holiday day(s) counted as working days because of approved "Working" requests` });
+  }
+
   // ---- Overtime (names -> employees via Calendar View names, Employee ID names and codes) ----
   if (ot && snap.employees) {
     const byName = new Map<string, string>();
@@ -163,8 +183,12 @@ export async function collect(source: SheetSource, mode: "quick" | "full"): Prom
     for (const id of ids ?? []) if (id.email) byName.set(nameKey(id.name), id.email);
     for (const r of snap.extra.workstudyRoster ?? []) byName.set(nameKey(r.name), r.email);
     const byCode = new Map((ids ?? []).filter((i) => i.email).map((i) => [i.code, i.email!]));
+    const people = snap.employees.map((e) => ({ key: e.key, name: e.name }));
     const res = guard("overtime/Wind OT tracker 2026", () =>
-      parseOvertime(ot["Wind OT tracker 2026"], (name, code) => byCode.get(code.toUpperCase()) ?? byName.get(nameKey(name)) ?? null),
+      parseOvertime(
+        ot["Wind OT tracker 2026"],
+        (name, code) => byCode.get(code.toUpperCase()) ?? byName.get(nameKey(name)) ?? fuzzyNameLookup(name, people),
+      ),
     );
     if (res) {
       snap.overtime = res.entries;

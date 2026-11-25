@@ -183,9 +183,15 @@ Notation: *d* = a date, *e* = employee, *p* = process. All periods are in IST.
 | `First/Second Half` CL, EL, EL CF, WL | 0.5 | half leave (half-day WL = 0.5 by decision 23 Nov; the sheet's own formula gives it 0, and the reconciliation check allows for that) |
 | EL, CL, WL, PL, EL CF, Comp Off | 0 | leave |
 | LoP | 0 | absent (unpaid) |
+| `GWO Training` (any code with "Training") | 1 for attendance, **0 for productivity** | training (decision 25 Nov) |
+| `Bereavement`, `Leave` | 0 | leave, shown as their own leave types (decision 25 Nov) |
+| Typos `Fisrt/Frist Half …`, `Secound Half …` | as the intended half-day code | half leave |
 | `Week Off` | — | not a working day |
 | `Public Holiday` | — | not a working day |
 
+* **Approved "Working" requests** (Leave Tracker type `Working`: working a day, e.g. a weekend, to
+  earn comp off) are **not leave**. If Calendar View shows Week Off / Public Holiday for that date,
+  the day counts as a present working day (decision 25 Nov).
 * **Present today** = Σ presence_weight over active employees for today.
 * **On leave today** = count of active employees with a leave or half-leave code today.
 * **Absent today** = count with LoP **or** an approved *Time Off – Unplanned* request covering today
@@ -359,3 +365,12 @@ account + OAuth client), a Supabase project and a Vercel project.
   and `/api/health` reports the database's own error text (secrets redacted).
 * **Cross-check values** (`reference_values`) are de-duplicated per key and can never fail a sync.
   The leave Dashboard is read only from its summary-card row.
+
+### Identity matching (added 25 Nov)
+
+* `@dronebase.com` addresses are the same people as `@zeitview.com` (`EMAIL_DOMAIN_ALIASES`).
+* Calendar View rows without an email (e.g. the *Resigned* section) are linked to the email their
+  output / leave uses when exactly one email matches the name (`src/lib/sync/identity.ts`); every
+  link is listed as a `linked_by_name` note in Data Sources.
+* OT tracker names fall back to "first name + surname initial" when that is unique
+  ("Guruprasad B" → "Guruprasad basavaraju").

@@ -125,9 +125,20 @@ function entryIncluded(ds: Dataset, process: string, f: Filter) {
 // ---------------------------------------------------------------------------------------------
 // Attendance
 
+/**
+ * Presence that counts toward productivity. Training days are present for attendance but no
+ * output is expected, so they are left out of productivity (decision 25 Nov).
+ */
+export function workPresence(c: CalendarDay | undefined): number {
+  if (!c || c.category === "training") return 0;
+  return c.presence ?? 0;
+}
+
 export interface AttendanceSummary {
   scheduledDays: number; // working days (not week off / holiday), up to today
-  presentDays: number; // Σ presence weight
+  presentDays: number; // Σ presence weight (attendance)
+  workDays: number; // presence that counts for productivity (training excluded)
+  trainingDays: number;
   leaveDays: number; // full leave = 1, half = 0.5
   wfhDays: number;
   lopDays: number;
@@ -136,13 +147,15 @@ export interface AttendanceSummary {
 }
 
 export function attendanceFor(ds: Dataset, key: string, f: { from: string; to: string }): AttendanceSummary {
-  const s: AttendanceSummary = { scheduledDays: 0, presentDays: 0, leaveDays: 0, wfhDays: 0, lopDays: 0, attendancePct: null, byLeaveType: {} };
+  const s: AttendanceSummary = { scheduledDays: 0, presentDays: 0, workDays: 0, trainingDays: 0, leaveDays: 0, wfhDays: 0, lopDays: 0, attendancePct: null, byLeaveType: {} };
   const to = f.to < ds.today ? f.to : ds.today;
   for (const d of eachDay(f.from, to)) {
     const c = ds.calendar.get(`${key}|${d}`);
     if (!c || c.presence === null) continue;
     s.scheduledDays++;
     s.presentDays += c.presence;
+    s.workDays += workPresence(c);
+    if (c.category === "training") s.trainingDays++;
     if (c.category === "wfh") s.wfhDays++;
     if (c.category === "lop") s.lopDays++;
     if (c.category === "leave" || c.category === "half_leave") {
@@ -165,7 +178,7 @@ function unplannedOn(ds: Dataset, key: string, date: string) {
 export interface DayStatusRow {
   employee: Employee;
   day: CalendarDay | undefined;
-  status: "present" | "wfh" | "half_leave" | "leave" | "absent" | "week_off" | "holiday" | "unknown" | "no_record";
+  status: "present" | "wfh" | "training" | "half_leave" | "leave" | "absent" | "week_off" | "holiday" | "unknown" | "no_record";
   leaveType: string | null;
   unplanned: boolean;
   outputLogged: boolean;
@@ -191,6 +204,7 @@ export interface HeadcountSummary {
   active: number;
   present: number; // weighted (half day = 0.5), as the sheet computes it
   wfh: number;
+  training: number;
   halfDay: number;
   onLeave: number; // people with a full or half leave code (planned)
   absent: number; // LoP or approved unplanned leave
@@ -201,17 +215,18 @@ export interface HeadcountSummary {
 
 export function headcount(ds: Dataset, date: string, f: Pick<Filter, "section" | "employee"> = {}): HeadcountSummary {
   const rows = dayStatus(ds, date, f);
-  const h: HeadcountSummary = { date, active: rows.length, present: 0, wfh: 0, halfDay: 0, onLeave: 0, absent: 0, weekOff: 0, holiday: 0, noOutputLogged: 0 };
+  const h: HeadcountSummary = { date, active: rows.length, present: 0, wfh: 0, training: 0, halfDay: 0, onLeave: 0, absent: 0, weekOff: 0, holiday: 0, noOutputLogged: 0 };
   for (const r of rows) {
     const p = r.day?.presence ?? (r.status === "no_record" ? 0 : 0);
     if (r.day?.presence) h.present += p;
     if (r.status === "wfh") h.wfh++;
+    if (r.status === "training") h.training++;
     if (r.status === "half_leave") h.halfDay++;
     if (r.status === "leave" || (r.status === "half_leave" && !r.unplanned)) h.onLeave++;
     if (r.status === "absent" || (r.status === "half_leave" && r.unplanned)) h.absent++;
     if (r.status === "week_off") h.weekOff++;
     if (r.status === "holiday") h.holiday++;
-    if ((r.day?.presence ?? 0) > 0 && !r.outputLogged && date < ds.today) h.noOutputLogged++;
+    if (workPresence(r.day) > 0 && !r.outputLogged && date < ds.today) h.noOutputLogged++;
   }
   return h;
 }
@@ -283,12 +298,12 @@ export function employeePerformance(ds: Dataset, key: string, f: Filter): Employ
   const to = f.to < ds.today ? f.to : addDays(ds.today, -1);
   for (const d of eachDay(f.from, to)) {
     const c = ds.calendar.get(`${key}|${d}`);
-    if (c && (c.presence ?? 0) > 0 && !logged.has(d)) noOutputDays++;
+    if (workPresence(c) > 0 && !logged.has(d)) noOutputDays++;
   }
-  const productivityPct = attendance.presentDays > 0 ? (output.targetDays / attendance.presentDays) * 100 : null;
+  const productivityPct = attendance.workDays > 0 ? (output.targetDays / attendance.workDays) * 100 : null;
   const coveragePct = output.totalSteps > 0 ? (output.targetedQty / output.totalSteps) * 100 : null;
   const rankable =
-    productivityPct !== null && (coveragePct ?? 0) >= RANKING_RULES.minCoveragePct && attendance.presentDays >= RANKING_RULES.minPresentDays;
+    productivityPct !== null && (coveragePct ?? 0) >= RANKING_RULES.minCoveragePct && attendance.workDays >= RANKING_RULES.minPresentDays;
   return { employee, attendance, output, daysWithOutput: logged.size, noOutputDays, productivityPct, coveragePct, rankable, rank: null };
 }
 
@@ -314,7 +329,7 @@ export interface TeamTotals {
 export function teamTotals(ds: Dataset, f: Filter): TeamTotals {
   const emps = employeesInScope(ds, f);
   let presentDays = 0;
-  for (const e of emps) presentDays += attendanceFor(ds, e.key, f).presentDays;
+  for (const e of emps) presentDays += attendanceFor(ds, e.key, f).workDays; // productivity denominator
   const out = outputSummary(ds, f);
   const pt = processTargets(ds, f);
   const expected = pt.reduce((a, r) => a + r.expectedQty, 0);
@@ -348,7 +363,7 @@ export function processTargets(ds: Dataset, f: Filter): ProcessTargetRow[] {
   const rows = new Map<string, ProcessTargetRow>();
   for (const s of submissionsInScope(ds, f)) {
     const c = ds.calendar.get(`${s.employeeKey}|${s.date}`);
-    const w = c?.presence ?? 0; // output on off days earns credit but adds no expected work
+    const w = workPresence(c); // output on off/training days earns credit but adds no expected work
     const shares: [string, number, ProcessInfo][] = [];
     let total = 0;
     for (const [p, q] of Object.entries(s.entries)) {
@@ -412,7 +427,7 @@ export function outputSeries(ds: Dataset, f: Filter, g: Grain): SeriesPoint[] {
   const to = f.to < ds.today ? f.to : ds.today;
   for (const d of eachDay(f.from, to)) {
     const p = get(bucketOf(d, g));
-    for (const e of emps) p.presentDays += ds.calendar.get(`${e.key}|${d}`)?.presence ?? 0;
+    for (const e of emps) p.presentDays += workPresence(ds.calendar.get(`${e.key}|${d}`));
   }
   for (const p of map.values()) p.productivityPct = p.presentDays > 0 ? (p.targetDays / p.presentDays) * 100 : null;
   return [...map.values()].sort((a, b) => (a.bucket < b.bucket ? -1 : 1));

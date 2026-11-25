@@ -13,6 +13,11 @@ function findHeaderRow(grid: Grid, mustHave: string): number {
   return -1;
 }
 
+/** Request type "Working": the person works that day to earn comp off. */
+export function isWorkingRequest(leaveType: string): boolean {
+  return /^working$/i.test(clean(leaveType));
+}
+
 export function isReverted(calendarStatus: string, calendarComment: string): boolean {
   return /revert/i.test(calendarStatus) || /revert/i.test(calendarComment);
 }
@@ -89,7 +94,8 @@ export function parseLeaveTracker(grid: Grid): { requests: LeaveRequest[]; issue
       zohoApplied: get(row, c.zoho),
       managerNote: get(row, c.manager),
       slackUrl: get(row, c.slack),
-      effective: /^approved$/i.test(approvalStatus) && !isReverted(calendarStatus, calendarComment),
+      // "Working" = working a day (e.g. a weekend) to earn comp off: not leave (decision 25 Nov).
+      effective: /^approved$/i.test(approvalStatus) && !isReverted(calendarStatus, calendarComment) && !isWorkingRequest(get(row, c.type)),
     });
   }
   return { requests, issues };

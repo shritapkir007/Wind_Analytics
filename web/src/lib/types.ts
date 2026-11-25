@@ -28,6 +28,7 @@ export type DayCategory =
   | "lop"
   | "week_off"
   | "holiday"
+  | "training"
   | "unknown";
 
 export interface CalendarDay {

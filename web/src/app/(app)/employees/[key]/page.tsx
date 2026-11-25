@@ -6,6 +6,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { Badge, Card, CardBody, CardHeader, Empty, KpiCard, PageHeader } from "@/components/ui";
 import { ColumnChart, LineTrend } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
+import { isWorkingRequest } from "@/lib/sheets/parsers/leave";
 import { LeaveCalendar } from "@/components/leave-calendar";
 import { change, comparisonPeriod, employeePerformance, isOverdue, outputSeries, teamPerformance } from "@/lib/domain/metrics";
 import { addDays, diffDays, fmtDate, fmtMonth, fmtRange, monthEnd, monthStart } from "@/lib/domain/dates";
@@ -151,7 +152,7 @@ export default async function Profile({ params, searchParams }: { params: Promis
                 to: { v: l.endDate, label: l.endDate ? fmtDate(l.endDate, true) : "—" },
                 type: l.leaveType,
                 kind: l.requestKind.replace("Time Off - ", ""),
-                status: { v: l.approvalStatus || "Pending", badge: true, tone: l.effective ? "good" : /declined/i.test(l.approvalStatus) ? "critical" : /approved/i.test(l.approvalStatus) ? "muted" : "warning", label: /approved/i.test(l.approvalStatus) && !l.effective ? "Reverted" : l.approvalStatus || "Pending" },
+                status: { v: l.approvalStatus || "Pending", badge: true, tone: l.effective ? "good" : /declined/i.test(l.approvalStatus) ? "critical" : /approved/i.test(l.approvalStatus) ? "muted" : "warning", label: /approved/i.test(l.approvalStatus) && !l.effective ? (isWorkingRequest(l.leaveType) ? "Work day" : "Reverted") : l.approvalStatus || "Pending" },
               }))}
               emptyText="No leave requests."
             />
