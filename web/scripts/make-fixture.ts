@@ -255,7 +255,13 @@ const tracker = [ltHeader.slice(0, 15), ...leaveRows.map((r) => r.slice(0, 15))]
 const count = (st: string) => leaveRows.filter((r) => r[10] === st).length;
 const dashboard = [[dmy(TODAY)], ["", "Employee Leave Requests Dashboard"], [], [], [], ["", "An overall summary of the employee's leaves in a year"], [], [],
   ["", "Total Leave \nRequests", "", "", "Approved Leave Requests", "", "", "In Discussion ", "", "", "Reconsider Request", "", "Leave Declined", "", "", "", "", "", "Pending Leave \nRequests"], [],
-  ["", String(leaveRows.length), "", "", String(count("Approved")), "", "", "0", "", "", "0", "", String(count("Declined")), "", "", "", "", "", String(count(""))]];
+  ["", String(leaveRows.length), "", "", String(count("Approved")), "", "", "0", "", "", "0", "", String(count("Declined")), "", "", "", "", "", String(count(""))],
+  // side tables with repeated headings, like the real Dashboard
+  [], [], [], [],
+  ["", "Employee(s) on Leave Today", "", "", "", "", "", "", "", "", "", "Leave Requested", "", "", "Leave Approved"],
+  ["Change Date", dmy(TODAY), "", "", "", "", "", "", "", "", "", "Request From", "Total Leaves", "", "Request From", "Total Leaves"],
+  ["", "", "", "", "", "", "", "", "", "", "", "Request from", "count Workflow ID", "", "Request from", "count Workflow ID"],
+  ["", "", "", "", "", "", "", "", "", "", "", people[0].email, "31", "", people[1].email, "30"]];
 
 const out = {
   workstudy: { "User Input": ui, "Active ZV": zv, Target: target, "Employee List": employeeList, ...pivotTabs },

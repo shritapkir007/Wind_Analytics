@@ -1,6 +1,6 @@
 import "server-only";
 import { and, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
-import { getDb, schema } from "../db";
+import { getDb, schema, shortDbError } from "../db";
 import { nowIso, todayIST } from "../config";
 import { getSource, type SheetSource } from "../sheets/source";
 import { collect } from "./collect";
@@ -64,17 +64,24 @@ export async function runSync(opts: {
       try {
         stats[name] = await db.transaction((tx) => applyDiff(tx, table, keys, rows));
       } catch (e) {
-        stats[name] = { read: rows.length, inserted: 0, updated: 0, deleted: 0, error: (e as Error).message };
+        stats[name] = { read: rows.length, inserted: 0, updated: 0, deleted: 0, error: shortDbError(e) };
       }
     }
-    // References are merged (a failed workbook keeps its previous reference values).
-    if (snap.references.length) {
-      const prefixes = [...new Set(snap.references.map((r) => r.key.split(".")[0]))];
-      await db.transaction(async (tx) => {
-        for (const p of prefixes) await tx.delete(schema.referenceValues).where(sql`${schema.referenceValues.key} like ${p + ".%"}`);
-        for (let i = 0; i < snap.references.length; i += 2000)
-          await tx.insert(schema.referenceValues).values(snap.references.slice(i, i + 2000).map((r) => ({ ...r, hash: "" })));
-      });
+    // References are merged (a failed workbook keeps its previous reference values). They are only
+    // used for cross-checks, so a problem here is recorded but never fails the sync.
+    const refs = [...new Map(snap.references.map((r) => [r.key, r] as const)).values()]; // one value per key
+    if (refs.length) {
+      try {
+        const prefixes = [...new Set(refs.map((r) => r.key.split(".")[0]))];
+        await db.transaction(async (tx) => {
+          for (const p of prefixes) await tx.delete(schema.referenceValues).where(sql`${schema.referenceValues.key} like ${p + ".%"}`);
+          for (let i = 0; i < refs.length; i += 2000)
+            await tx.insert(schema.referenceValues).values(refs.slice(i, i + 2000).map((r) => ({ ...r, hash: "" })));
+        });
+        stats.references = { read: refs.length, inserted: refs.length, updated: 0, deleted: 0 };
+      } catch (e) {
+        stats.references = { read: refs.length, inserted: 0, updated: 0, deleted: 0, error: shortDbError(e) };
+      }
     }
 
     for (let i = 0; i < issues.length; i += 1000)
@@ -95,7 +102,7 @@ export async function runSync(opts: {
     }
     return { runId: run.id, status, stats, issues: issues.length, error: error ?? undefined };
   } catch (e) {
-    const msg = (e as Error).message;
+    const msg = shortDbError(e);
     await db.update(schema.syncRuns).set({ status: "failed", finishedAt: nowIso(), stats, error: msg }).where(eq(schema.syncRuns.id, run.id));
     try {
       await refreshAlerts();
