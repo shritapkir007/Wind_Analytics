@@ -375,3 +375,17 @@ account + OAuth client), a Supabase project and a Vercel project.
   link is listed as a `linked_by_name` note in Data Sources.
 * OT tracker names fall back to "first name + surname initial" when that is unique
   ("Guruprasad B" → "Guruprasad basavaraju").
+
+### Teams (decision 25 Nov)
+
+Calendar View sections are **sub-teams** grouped into teams (`src/lib/teams.ts`):
+
+| Team | Sub-teams (Calendar View section) |
+|---|---|
+| Wind Team | Wind Team (core, the unnamed first section) · Data Process · WFH · GWO (Field operations) · LM Blade Pilot |
+| Properties-Wind-Utilities Cross Vertical | — |
+| Encord Team | Encord Project |
+| Former members (inactive) | Resigned/Layed OFF People · Department changed |
+
+The Team filter accepts a whole team or one sub-team. A new section added to Calendar View
+appears as its own team until it is added to the mapping.

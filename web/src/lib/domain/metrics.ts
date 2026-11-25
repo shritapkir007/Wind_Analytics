@@ -3,6 +3,7 @@
 import type { CalendarDay, DeliveryDay, Employee, LeaveRequest, OutputSubmission, OvertimeEntry, Stream, TargetRow } from "../types";
 import { PROCESSES, processFor, resolveTarget, type Family, type ProcessDef, type ResolvedTarget } from "../processes";
 import { addDays, eachDay, monthStart, previousPeriod, weekStart } from "./dates";
+import { inTeamScope } from "../teams";
 
 export interface Task {
   id: number;
@@ -101,7 +102,7 @@ export function employeesInScope(ds: Dataset, f: Pick<Filter, "section" | "emplo
   return ds.employees.filter(
     (e) =>
       (includeInactive || e.isActive) &&
-      (!f.section || e.section === f.section) &&
+      inTeamScope(e, f.section) &&
       (!f.employee || e.key === f.employee),
   );
 }
@@ -113,7 +114,7 @@ export function submissionsInScope(ds: Dataset, f: Filter): OutputSubmission[] {
   return ds.submissions.filter((s) => {
     if (!inRange(s.date, f)) return false;
     if (f.employee && s.employeeKey !== f.employee) return false;
-    if (f.section && ds.emp.get(s.employeeKey)?.section !== f.section) return false;
+    if (f.section && !inTeamScope(ds.emp.get(s.employeeKey), f.section)) return false;
     return true;
   });
 }
@@ -530,7 +531,7 @@ export function leaveRequestsInRange(ds: Dataset, f: Filter) {
       l.startDate <= f.to &&
       l.endDate >= f.from &&
       (!f.employee || l.employeeKey === f.employee) &&
-      (!f.section || ds.emp.get(l.employeeKey)?.section === f.section),
+      inTeamScope(ds.emp.get(l.employeeKey), f.section),
   );
 }
 
@@ -544,7 +545,7 @@ export function upcomingLeave(ds: Dataset, f: Pick<Filter, "section" | "employee
         l.startDate > ds.today &&
         l.startDate <= end &&
         (!f.employee || l.employeeKey === f.employee) &&
-        (!f.section || ds.emp.get(l.employeeKey)?.section === f.section),
+        inTeamScope(ds.emp.get(l.employeeKey), f.section),
     )
     .sort((a, b) => (a.startDate! < b.startDate! ? -1 : 1));
 }
@@ -570,7 +571,7 @@ export function isOverdue(t: Task, today: string) {
 
 export function taskSummary(ds: Dataset, f: Pick<Filter, "employee" | "section">) {
   const ts = ds.tasks.filter(
-    (t) => (!f.employee || t.assigneeKey === f.employee) && (!f.section || (t.assigneeKey && ds.emp.get(t.assigneeKey)?.section === f.section)),
+    (t) => (!f.employee || t.assigneeKey === f.employee) && (!f.section || (Boolean(t.assigneeKey) && inTeamScope(ds.emp.get(t.assigneeKey!), f.section))),
   );
   const byStatus: Record<string, number> = {};
   for (const t of ts) byStatus[t.status] = (byStatus[t.status] ?? 0) + 1;

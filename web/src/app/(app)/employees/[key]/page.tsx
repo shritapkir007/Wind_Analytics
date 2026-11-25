@@ -13,6 +13,7 @@ import { addDays, diffDays, fmtDate, fmtMonth, fmtRange, monthEnd, monthStart } 
 import { FAMILIES } from "@/lib/processes";
 import { FAMILY_COLOR, fmtNum, fmtPct, qs, type SP } from "@/lib/view";
 
+import { teamLabel } from "@/lib/teams";
 export const dynamic = "force-dynamic";
 
 export default async function Profile({ params, searchParams }: { params: Promise<{ key: string }>; searchParams: Promise<SP> }) {
@@ -56,7 +57,7 @@ export default async function Profile({ params, searchParams }: { params: Promis
             <Badge tone="accent" dot={false}>
               {p.employee.role || "—"}
             </Badge>
-            <Badge dot={false}>{p.employee.section || "—"}</Badge>
+            <Badge dot={false}>{p.employee.section ? teamLabel(p.employee.section) : "—"}</Badge>
             {p.employee.employeeCode && <Badge dot={false}>{p.employee.employeeCode}</Badge>}
             {!p.employee.isActive && <Badge tone="warning">Inactive / not in roster</Badge>}
             {p.employee.email && (

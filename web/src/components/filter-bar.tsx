@@ -21,7 +21,7 @@ export function FilterBar({
   preset,
   from,
   to,
-  sections,
+  teams,
   employees,
   families,
   showFamily = false,
@@ -32,7 +32,7 @@ export function FilterBar({
   preset: string;
   from: string;
   to: string;
-  sections: string[];
+  teams: { team: string; subTeams: string[] }[];
   employees: { key: string; name: string }[];
   families?: string[];
   showFamily?: boolean;
@@ -87,11 +87,22 @@ export function FilterBar({
       </label>
       <select id="f-section" className={sel} value={sp.get("section") ?? ""} onChange={(e) => set({ section: e.target.value || null, employee: null })}>
         <option value="">All teams</option>
-        {sections.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
+        {teams.map((g) =>
+          g.subTeams.length === 1 && g.subTeams[0] === g.team ? (
+            <option key={g.team} value={g.team}>
+              {g.team}
+            </option>
+          ) : (
+            <optgroup key={g.team} label={g.team}>
+              <option value={g.team}>All of {g.team}</option>
+              {g.subTeams.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </optgroup>
+          ),
+        )}
       </select>
       <label className="sr-only" htmlFor="f-employee">
         Employee
