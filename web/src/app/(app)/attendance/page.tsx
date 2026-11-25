@@ -4,6 +4,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { Badge, Card, CardBody, CardHeader, Empty, KpiCard, PageHeader } from "@/components/ui";
 import { ColumnChart, LineTrend } from "@/components/charts";
 import { DataTable } from "@/components/data-table";
+import { isWorkingRequest } from "@/lib/sheets/parsers/leave";
 import { LeaveCalendar } from "@/components/leave-calendar";
 import {
   attendanceFor,
@@ -225,7 +226,7 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
           </CardBody>
         </Card>
         <Card id="requests" className="xl:col-span-2">
-          <CardHeader title="Leave requests" subtitle={`Leave Tracker · requests overlapping ${fmtRange(v.from, v.to)}, plus every pending request`} info="Effective = Approved and not reverted in Calendar View ('Revert Leave' / 'Leave Reverted'). Reverted leaves are not counted anywhere." />
+          <CardHeader title="Leave requests" subtitle={`Leave Tracker · requests overlapping ${fmtRange(v.from, v.to)}, plus every pending request`} info="Effective = Approved and not reverted in Calendar View ('Revert Leave' / 'Leave Reverted'). Reverted leaves are not counted anywhere. 'Working' requests are work days that earn comp off: that day counts as a working day, not leave." />
           <CardBody>
             <DataTable
               filename="leave-requests"
@@ -248,7 +249,7 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
                 kind: l.requestKind.replace("Time Off - ", ""),
                 start: { v: l.startDate, label: l.startDate ? fmtDate(l.startDate, true) : "—" },
                 end: { v: l.endDate, label: l.endDate ? fmtDate(l.endDate, true) : "—" },
-                status: { v: l.approvalStatus || "Pending", badge: true, tone: /^approved$/i.test(l.approvalStatus) ? (l.effective ? "good" : "muted") : /^declined$/i.test(l.approvalStatus) ? "critical" : "warning", label: /^approved$/i.test(l.approvalStatus) && !l.effective ? "Approved · reverted" : l.approvalStatus || "Pending" },
+                status: { v: l.approvalStatus || "Pending", badge: true, tone: /^approved$/i.test(l.approvalStatus) ? (l.effective ? "good" : "muted") : /^declined$/i.test(l.approvalStatus) ? "critical" : "warning", label: /^approved$/i.test(l.approvalStatus) && !l.effective ? (isWorkingRequest(l.leaveType) ? "Approved · work day" : "Approved · reverted") : l.approvalStatus || "Pending" },
                 cal: l.calendarStatus || "—",
               }))}
             />

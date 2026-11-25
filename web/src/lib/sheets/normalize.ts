@@ -10,11 +10,23 @@ export function clean(v: Cell): string {
   return (v ?? "").replace(ZERO_WIDTH, "").replace(/\s+/g, " ").trim();
 }
 
-/** Canonical employee key from an email: lower-case, no zero-width chars, "+suffix" removed. */
+/**
+ * Domains that belong to the same people. DroneBase is the company's legal name, so
+ * "name@dronebase.com" and "name@zeitview.com" are one person. Override with EMAIL_DOMAIN_ALIASES
+ * ("old.com=new.com,other.com=new.com").
+ */
+const DOMAIN_ALIASES: Record<string, string> = Object.fromEntries(
+  (process.env.EMAIL_DOMAIN_ALIASES ?? "dronebase.com=zeitview.com")
+    .split(",")
+    .map((p) => p.split("=").map((x) => x.trim().toLowerCase()))
+    .filter((p) => p.length === 2 && p[0] && p[1]),
+);
+
+/** Canonical employee key from an email: lower-case, no zero-width chars, "+suffix" removed, domain aliases applied. */
 export function normEmail(v: Cell): string | null {
   const s = clean(v).toLowerCase();
   const m = s.match(/^([^@\s+]+)(?:\+[^@\s]*)?@([^@\s]+\.[a-z]{2,})$/);
-  return m ? `${m[1]}@${m[2]}` : null;
+  return m ? `${m[1]}@${DOMAIN_ALIASES[m[2]] ?? m[2]}` : null;
 }
 
 /** Name key used to match names across tabs (different spellings stay distinct). */

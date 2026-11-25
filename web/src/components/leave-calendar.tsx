@@ -7,6 +7,7 @@ import type { Employee } from "@/lib/types";
 export const CAL_LEGEND: { key: string; label: string; color: string; code: string }[] = [
   { key: "present", label: "Present", color: "var(--cal-present)", code: "" },
   { key: "wfh", label: "WFH", color: "var(--cal-wfh)", code: "W" },
+  { key: "training", label: "Training", color: "var(--cal-training)", code: "T" },
   { key: "leave", label: "Approved leave", color: "var(--cal-leave)", code: "L" },
   { key: "half_leave", label: "Half-day leave", color: "var(--cal-half)", code: "½" },
   { key: "pending", label: "Pending leave", color: "var(--cal-pending)", code: "P" },

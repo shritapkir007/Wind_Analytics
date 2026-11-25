@@ -14,26 +14,36 @@ const MON: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
 const LEAVE_CODES = ["el cf", "comp off", "el", "cl", "wl", "pl"];
+/** Named leave types without a short code (decision 25 Nov: count as leave, own type). */
+const NAMED_LEAVE: Record<string, string> = { bereavement: "Bereavement", "bereavement leave": "Bereavement", leave: "Leave" };
+
+const leaveLabel = (code: string) => (code === "comp off" ? "Comp Off" : code.toUpperCase());
 
 export function classifyCode(raw: string): {
   category: DayCategory;
   leaveType: string | null;
   presence: number | null;
 } {
-  const c = clean(raw).toLowerCase();
+  const c = clean(raw)
+    .toLowerCase()
+    // common typos in the sheet: "Fisrt Half WL", "Frist Half CL", "Secound Half EL", "1st half …"
+    .replace(/^(fisrt|frist|firts|1st)\b/, "first")
+    .replace(/^(secound|seccond|secnd|2nd)\b/, "second")
+    .replace(/\s+half\s+/, " half ");
   if (c === "" || c === "working") return { category: "present", leaveType: null, presence: 1 };
   if (c === "wfh") return { category: "wfh", leaveType: null, presence: 1 };
   if (c === "week off") return { category: "week_off", leaveType: null, presence: null };
   if (c === "public holiday" || c === "holiday") return { category: "holiday", leaveType: null, presence: null };
+  // Decision 25 Nov: training days count as present for attendance but are left out of productivity.
+  if (/\btraining\b/.test(c)) return { category: "training", leaveType: null, presence: 1 };
   if (/\b(lop|loss of pay)\b/.test(c)) return { category: "lop", leaveType: "LoP", presence: 0 };
   const half = c.match(/^(first|second) half (.+)$/);
   if (half && LEAVE_CODES.includes(half[2])) {
     // Decision 23 Nov: every half-day leave (incl. WL) = 0.5 present.
-    return { category: "half_leave", leaveType: half[2].toUpperCase().replace("COMP OFF", "Comp Off"), presence: 0.5 };
+    return { category: "half_leave", leaveType: leaveLabel(half[2]), presence: 0.5 };
   }
-  if (LEAVE_CODES.includes(c)) {
-    return { category: "leave", leaveType: c === "comp off" ? "Comp Off" : c.toUpperCase(), presence: 0 };
-  }
+  if (LEAVE_CODES.includes(c)) return { category: "leave", leaveType: leaveLabel(c), presence: 0 };
+  if (NAMED_LEAVE[c]) return { category: "leave", leaveType: NAMED_LEAVE[c], presence: 0 };
   return { category: "unknown", leaveType: null, presence: 0 };
 }
 
