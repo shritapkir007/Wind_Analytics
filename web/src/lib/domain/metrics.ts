@@ -193,7 +193,6 @@ export function dayStatus(ds: Dataset, date: string, f: Pick<Filter, "section" |
     let status: DayStatusRow["status"];
     if (!day) status = "no_record";
     else if (day.category === "lop") status = "absent";
-    else if ((day.category === "leave" || day.category === "half_leave") && unplanned) status = day.category === "half_leave" ? "half_leave" : "absent";
     else status = day.category as DayStatusRow["status"];
     return { employee: e, day, status, leaveType: day?.leaveType ?? null, unplanned, outputLogged: logged.has(e.key) };
   });
@@ -207,7 +206,8 @@ export interface HeadcountSummary {
   training: number;
   halfDay: number;
   onLeave: number; // people with a full or half leave code (planned)
-  absent: number; // LoP or approved unplanned leave
+  absent: number; // LoP only (decision 25 Nov: unplanned leave is still leave)
+  unplannedLeave: number; // on leave today with an approved "Time Off – Unplanned" request
   weekOff: number;
   holiday: number;
   noOutputLogged: number; // present but no User Input row
@@ -215,15 +215,18 @@ export interface HeadcountSummary {
 
 export function headcount(ds: Dataset, date: string, f: Pick<Filter, "section" | "employee"> = {}): HeadcountSummary {
   const rows = dayStatus(ds, date, f);
-  const h: HeadcountSummary = { date, active: rows.length, present: 0, wfh: 0, training: 0, halfDay: 0, onLeave: 0, absent: 0, weekOff: 0, holiday: 0, noOutputLogged: 0 };
+  const h: HeadcountSummary = { date, active: rows.length, present: 0, wfh: 0, training: 0, halfDay: 0, onLeave: 0, absent: 0, unplannedLeave: 0, weekOff: 0, holiday: 0, noOutputLogged: 0 };
   for (const r of rows) {
     const p = r.day?.presence ?? (r.status === "no_record" ? 0 : 0);
     if (r.day?.presence) h.present += p;
     if (r.status === "wfh") h.wfh++;
     if (r.status === "training") h.training++;
     if (r.status === "half_leave") h.halfDay++;
-    if (r.status === "leave" || (r.status === "half_leave" && !r.unplanned)) h.onLeave++;
-    if (r.status === "absent" || (r.status === "half_leave" && r.unplanned)) h.absent++;
+    if (r.status === "leave" || r.status === "half_leave") {
+      h.onLeave++;
+      if (r.unplanned) h.unplannedLeave++;
+    }
+    if (r.status === "absent") h.absent++;
     if (r.status === "week_off") h.weekOff++;
     if (r.status === "holiday") h.holiday++;
     if (workPresence(r.day) > 0 && !r.outputLogged && date < ds.today) h.noOutputLogged++;

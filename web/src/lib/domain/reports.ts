@@ -89,7 +89,7 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
       { label: "Active employees", value: String(hc.active) },
       { label: "Present", value: String(r1(hc.present)), note: `${hc.wfh} WFH, ${hc.halfDay} half-day` },
       { label: "On leave", value: String(hc.onLeave) },
-      { label: "Absent (LoP / unplanned)", value: String(hc.absent) },
+      { label: "Absent (LoP)", value: String(hc.absent), note: hc.unplannedLeave ? `${hc.unplannedLeave} on unplanned leave (counted as leave)` : undefined },
       { label: "No output logged", value: String(hc.noOutputLogged) },
     );
   } else {
@@ -124,7 +124,7 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
     rep.tables.push({
       title: "Leave & absence",
       columns: ["Employee", "Team", "Status", "Code"],
-      rows: st.filter((r) => ["leave", "half_leave", "absent"].includes(r.status)).map((r) => [r.employee.name, r.employee.section, r.status === "absent" || r.unplanned ? "Absent / unplanned" : r.status === "half_leave" ? "Half-day leave" : "On leave", r.day?.rawCode ?? ""]),
+      rows: st.filter((r) => ["leave", "half_leave", "absent"].includes(r.status)).map((r) => [r.employee.name, r.employee.section, r.status === "absent" ? "Absent (LoP)" : `${r.status === "half_leave" ? "Half-day leave" : "On leave"}${r.unplanned ? " · unplanned" : ""}`, r.day?.rawCode ?? ""]),
     });
     rep.tables.push({
       title: "Present but no output logged",

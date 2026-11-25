@@ -21,7 +21,7 @@ export interface AppSettings {
 
 export const ALERT_KINDS: Record<string, { label: string; description: string }> = {
   on_leave_today: { label: "On leave today", description: "Everyone with a leave code in Calendar View today" },
-  unplanned_absence: { label: "Unplanned absence", description: "LoP, or an approved Time Off – Unplanned request covering today" },
+  unplanned_absence: { label: "Absent (LoP)", description: "Marked LoP in Calendar View today. Unplanned leave counts as leave (see 'On leave today')." },
   low_daily_output: { label: "Low daily output", description: "Productivity for a working day below the threshold" },
   missed_weekly_target: { label: "Missed weekly target", description: "Last full week's productivity below the threshold" },
   no_output_logged: { label: "No output logged", description: "Present on a working day but no User Input entry after the grace period" },

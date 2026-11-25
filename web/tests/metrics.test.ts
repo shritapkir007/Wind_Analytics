@@ -33,9 +33,10 @@ const ds = buildDataset({ today: "2026-01-08", employees: [emp(A), emp(B), emp(C
 const F = { from: "2026-01-05", to: "2026-01-07" };
 
 describe("attendance", () => {
-  it("weights half days 0.5 (incl. WL) and separates unplanned absence from planned leave", () => {
+  it("weights half days 0.5 (incl. WL); unplanned leave is leave, only LoP is absent", () => {
     const h = headcount(ds, "2026-01-06");
-    expect(h).toMatchObject({ active: 3, present: 1, onLeave: 0, absent: 1, weekOff: 1 });
+    // B has an approved unplanned CL: on leave (tagged unplanned), not absent (decision 25 Nov)
+    expect(h).toMatchObject({ active: 3, present: 1, onLeave: 1, unplannedLeave: 1, absent: 0, weekOff: 1 });
     const h7 = headcount(ds, "2026-01-07");
     expect(h7).toMatchObject({ present: 0.5 + 0.5 + 1, halfDay: 2, onLeave: 2 });
     const h5 = headcount(ds, "2026-01-05");
