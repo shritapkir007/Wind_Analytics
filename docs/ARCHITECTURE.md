@@ -382,7 +382,7 @@ Calendar View sections are **sub-teams** grouped into teams (`src/lib/teams.ts`)
 
 | Team | Sub-teams (Calendar View section) |
 |---|---|
-| Wind Team | Wind Team (core, the unnamed first section) · Data Process · WFH · GWO (Field operations) · LM Blade Pilot |
+| Wind Team | **Wind Team (core)** = the unnamed first section + Data Process + WFH sections · GWO (Field operations) · LM Blade Pilot |
 | Properties-Wind-Utilities Cross Vertical | — |
 | Encord Team | Encord Project |
 | Former members (inactive) | Resigned/Layed OFF People · Department changed |

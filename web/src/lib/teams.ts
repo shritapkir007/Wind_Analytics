@@ -11,8 +11,9 @@ export interface TeamInfo {
 
 const RULES: { test: RegExp; team: string; subTeam: string; order: number }[] = [
   { test: /^wind team$/i, team: "Wind Team", subTeam: "Wind Team (core)", order: 10 },
-  { test: /^data process/i, team: "Wind Team", subTeam: "Data Process", order: 11 },
-  { test: /^wfh$/i, team: "Wind Team", subTeam: "WFH", order: 12 },
+  // Decision 25 Nov: the Data Process and WFH sections are part of Wind Team (core).
+  { test: /^data process/i, team: "Wind Team", subTeam: "Wind Team (core)", order: 10 },
+  { test: /^wfh$/i, team: "Wind Team", subTeam: "Wind Team (core)", order: 10 },
   // GWO members are Wind Team on field operations.
   { test: /^gwo/i, team: "Wind Team", subTeam: "GWO (Field operations)", order: 13 },
   { test: /lm blade pilot/i, team: "Wind Team", subTeam: "LM Blade Pilot", order: 14 },
