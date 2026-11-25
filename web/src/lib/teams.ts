@@ -30,6 +30,11 @@ export function teamOf(section: string): TeamInfo {
   return r ? { team: r.team, subTeam: r.subTeam, order: r.order } : { team: s || "Unassigned", subTeam: s || "Unassigned", order: 50 };
 }
 
+/** Sections whose members are current staff (everything except Resigned / Department changed). */
+export function isActiveSection(section: string): boolean {
+  return teamOf(section).team !== "Former members" && teamOf(section).team !== "Not in Calendar View";
+}
+
 export type TeamedEmployee = Employee & TeamInfo;
 
 export function withTeam(e: Employee): TeamedEmployee {

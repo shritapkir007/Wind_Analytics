@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inTeamScope, teamLabel, teamOf, teamTree } from "@/lib/teams";
+import { inTeamScope, isActiveSection, teamLabel, teamOf, teamTree } from "@/lib/teams";
 
 const emp = (section: string) => ({ key: section, email: null, name: section, role: "", section, isActive: true, employeeCode: null });
 
@@ -36,5 +36,12 @@ describe("team structure (decision 25 Nov)", () => {
     ]);
     expect(teamLabel("Data Process ")).toBe("Wind Team · Wind Team (core)");
     expect(teamLabel("Encord Project")).toBe("Encord Team");
+  });
+
+  it("treats linked people in current sections as active", () => {
+    expect(isActiveSection("LM Blade Pilot ")).toBe(true);
+    expect(isActiveSection("GWO ")).toBe(true);
+    expect(isActiveSection("Resigned/Layed OFF People ")).toBe(false);
+    expect(isActiveSection("Department Changed ")).toBe(false);
   });
 });

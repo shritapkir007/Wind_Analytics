@@ -22,6 +22,7 @@ import { parseActiveZv, parseEmployeeList, parsePivot, parseTargets } from "../s
 import { parseEmployeeIds, parseOvertime } from "../sheets/parsers/overtime";
 import { PROCESSES } from "../processes";
 import { applyWorkingRequests, fuzzyNameLookup, linkNamelessRows } from "./identity";
+import { isActiveSection } from "../teams";
 
 export interface Snapshot {
   employees?: Employee[];
@@ -149,7 +150,9 @@ export async function collect(source: SheetSource, mode: "quick" | "full"): Prom
     for (const [oldKey, email] of links) {
       const e = byKey.get(oldKey)!;
       byKey.delete(oldKey);
-      byKey.set(email, { ...e, key: email, email, employeeCode: ids?.find((i) => i.email === email)?.code ?? e.employeeCode });
+      // Once linked to an email, people in a current section (e.g. LM Blade Pilot) are active;
+      // Resigned / Department changed stay inactive.
+      byKey.set(email, { ...e, key: email, email, isActive: isActiveSection(e.section), employeeCode: ids?.find((i) => i.email === email)?.code ?? e.employeeCode });
       for (const d of snap.calendar ?? []) if (d.employeeKey === oldKey) d.employeeKey = email;
       extraKeys.delete(email);
       snap.issues.push({ source: "leave", tab: "Calendar View", rowRef: e.name, severity: "info", code: "linked_by_name", message: `"${e.name}" (no email in Calendar View, section "${e.section}") linked to ${email} by name` });
