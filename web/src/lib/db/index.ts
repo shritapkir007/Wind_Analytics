@@ -15,7 +15,7 @@ async function connect(): Promise<DB> {
     const { drizzle } = await import("drizzle-orm/postgres-js");
     const { migrate } = await import("drizzle-orm/postgres-js/migrator");
     const postgres = (await import("postgres")).default;
-    // Supabase's transaction pooler (port 6543) does not support prepared statements.
+    // Prepared statements off: safe with every Supabase pooler mode (session 5432 recommended).
     // Cloud databases get an encrypted connection unless the URL already sets sslmode.
     const host = (() => {
       try {
@@ -112,4 +112,21 @@ export async function withDbTimeout<T>(p: Promise<T>, what: string, ms = Number(
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * Short, readable error for the UI and sync log: the driver's own reason (e.g. "duplicate key
+ * value violates unique constraint …") instead of drizzle's "Failed query: <whole SQL>" wrapper.
+ */
+export function shortDbError(e: unknown, max = 400): string {
+  const chain: { message?: string; code?: string; detail?: string }[] = [];
+  let cur: unknown = e;
+  for (let i = 0; cur && i < 5; i++) {
+    chain.push(cur as never);
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  const root = [...chain].reverse().find((x) => x.message && !/^Failed query:/.test(x.message)) ?? chain[0] ?? {};
+  let text = `${root.message ?? String(e)}${root.detail ? ` — ${root.detail}` : ""}${root.code ? ` (${root.code})` : ""}`;
+  text = describeDbError({ message: text });
+  return text.length > max ? `${text.slice(0, max)}…` : text;
 }

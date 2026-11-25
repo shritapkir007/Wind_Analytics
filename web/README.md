@@ -48,7 +48,12 @@ must all equal `ALLOWED_EMAIL_DOMAIN`.
 
 ### 1.3 Supabase (database)
 1. Create a project at <https://supabase.com/> (region close to India, e.g. Mumbai).
-2. **Project Settings → Database → Connection string → Transaction pooler** → `DATABASE_URL`.
+2. **Connect → Direct → Connection method: Session pooler → Type: URI** → `DATABASE_URL`.
+   - Use the **Session pooler** (host `…pooler.supabase.com`, port **5432**, user `postgres.<project-id>`).
+     The *Transaction pooler* (port 6543) made multi-query pages hang on Vercel, and the
+     *Direct connection* (`db.<project-id>.supabase.co`) is IPv6-only and unreachable from Vercel.
+   - Use a password of letters, digits and `_` only (`@ # / : ?` break the connection string),
+     and replace the `[YOUR-PASSWORD]` placeholder including the brackets.
 3. Tables are created automatically on first start (migrations in `./drizzle`).
 
 ### 1.4 Vercel (hosting)

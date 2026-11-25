@@ -113,19 +113,22 @@ export function parseTrackerIds(grid: Grid): Set<string> {
  * (e.g. "Total Leave Requests" -> 1975). Returned as references for reconciliation.
  */
 export function parseLeaveDashboard(grid: Grid): Reference[] {
-  const out: Reference[] = [];
-  for (let r = 0; r < Math.min(grid.length, 20); r++) {
-    (grid[r] ?? []).forEach((cell, col) => {
-      const label = clean(cell);
-      if (!label || /^\d/.test(label)) return;
-      for (const dr of [1, 2]) {
-        const v = clean(grid[r + dr]?.[col]);
-        if (/^\d+$/.test(v)) {
-          out.push({ key: `leaveDashboard.${label}`, value: Number(v) });
-          break;
-        }
+  // Only the summary-card row (the one holding "Total Leave Requests") is read. The tab also has
+  // side tables whose headings repeat ("Total Leaves", "count Workflow ID"); those are ignored.
+  const r = grid.findIndex((row, i) => i < 30 && (row ?? []).some((c) => /total\s*leave\s*requests/i.test(clean(c))));
+  if (r < 0) return [];
+  const out = new Map<string, number>();
+  (grid[r] ?? []).forEach((cell, col) => {
+    const label = clean(cell);
+    if (!label || /^\d/.test(label)) return;
+    for (const dr of [1, 2]) {
+      const v = clean(grid[r + dr]?.[col]);
+      if (/^\d+$/.test(v)) {
+        const key = `leaveDashboard.${label}`;
+        if (!out.has(key)) out.set(key, Number(v));
+        break;
       }
-    });
-  }
-  return out;
+    }
+  });
+  return [...out].map(([key, value]) => ({ key, value }));
 }

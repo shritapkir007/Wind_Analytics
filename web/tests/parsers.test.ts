@@ -133,6 +133,29 @@ describe("Leave", () => {
     expect(r.requests[0].appliedAt).toBe("2025-12-31T11:39:00+05:30");
     expect(r.requests[0].zohoApplied).toBe("Yes");
   });
+  it("reads only the summary cards, not the repeated side-table headings", () => {
+    // Mirrors the real Dashboard: cards in one row, then side tables with repeated headings.
+    const d = parseLeaveDashboard([
+      ["11/23/2026"], ["", "Employee Leave Requests Dashboard"], [], [], [], [], [], [],
+      ["", "Total Leave \nRequests", "", "", "Approved Leave Requests", "", "", "In Discussion ", "", "", "Reconsider Request", "", "Leave Declined"],
+      [],
+      ["", "1975", "", "", "1897", "", "", "0", "", "", "4", "", "65"],
+      [], [], [], [],
+      ["", "Employee(s) on Leave Today", "", "", "", "", "", "", "", "", "", "Leave Requested", "", "", "Leave Approved"],
+      ["Change Date", "23/11/2026", "", "", "", "", "", "", "", "", "", "Request From", "Total Leaves", "", "Request From", "Total Leaves"],
+      ["", "", "", "", "", "", "", "", "", "", "", "Request from", "count Workflow ID", "", "Request from", "count Workflow ID"],
+      ["", "", "", "", "", "", "", "", "", "", "", "a@example.com", "31", "", "b@example.com", "30"],
+    ]);
+    expect(d.map((x) => x.key)).toEqual([
+      "leaveDashboard.Total Leave Requests",
+      "leaveDashboard.Approved Leave Requests",
+      "leaveDashboard.In Discussion",
+      "leaveDashboard.Reconsider Request",
+      "leaveDashboard.Leave Declined",
+    ]);
+    expect(new Set(d.map((x) => x.key)).size).toBe(d.length);
+  });
+
   it("reads dashboard cards", () => {
     const d = parseLeaveDashboard([
       ["11/23/2026"], ["", "Employee Leave Requests Dashboard"], [], [], [], [], [], [],

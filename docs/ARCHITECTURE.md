@@ -348,3 +348,14 @@ Roles: admin, manager, lead, viewer (the employee-login role is reserved for lat
 
 Step-by-step setup is in [`web/README.md`](../web/README.md): a Google Cloud project (service
 account + OAuth client), a Supabase project and a Vercel project.
+
+## 11. Deployment notes (learned while going live)
+
+* **Database connection:** use Supabase's **Session pooler** (port 5432). The Transaction pooler
+  (6543) made pages that run ~10 queries at once hang until Vercel's 300 s limit, even with
+  query pipelining disabled; the Direct connection is IPv6-only and unreachable from Vercel.
+* **Safety nets:** database calls on pages fail after 25–60 s with a readable message
+  (`withDbTimeout`), pages show a loading skeleton and an error panel instead of a blank screen,
+  and `/api/health` reports the database's own error text (secrets redacted).
+* **Cross-check values** (`reference_values`) are de-duplicated per key and can never fail a sync.
+  The leave Dashboard is read only from its summary-card row.
