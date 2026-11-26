@@ -7,7 +7,7 @@ import { Badge, Card, CardBody, CardHeader, PageHeader, input } from "@/componen
 import { AddUser, RoleSelect, SettingsForm } from "@/components/admin-client";
 import { ALLOWED_DOMAIN } from "@/lib/config";
 import { getDataMode } from "@/lib/entry/store";
-import { GoLiveSwitch, HolidayManager, TargetEditor } from "@/components/entry/forms";
+import { BackToSheetsSwitch, GoLiveSwitch, HolidayManager, TargetEditor } from "@/components/entry/forms";
 
 export const dynamic = "force-dynamic";
 
@@ -142,6 +142,15 @@ export default async function Settings() {
                   <li>A lead can mark a day by hand (e.g. LoP) on the Attendance page; that wins over everything else.</li>
                 </ul>
               </div>
+              {admin && (
+                <div className="rounded-xl border border-line p-4 xl:col-span-2">
+                  <h3 className="mb-1 text-[13px] font-semibold text-ink">Trial run? Switch back to the Google Sheets</h3>
+                  <p className="mb-3 text-[12.5px] text-ink-2">
+                    Reloads everything from the sheets (they were never changed). Anything entered in the app — output, leave, overtime, inventory, roster edits and manual attendance marks — is removed. Holidays, tasks, users and settings are kept. You can switch to in-app entry again later with START FRESH.
+                  </p>
+                  <BackToSheetsSwitch />
+                </div>
+              )}
             </div>
           )}
         </CardBody>

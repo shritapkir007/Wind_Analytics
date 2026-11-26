@@ -743,3 +743,26 @@ export function GoLiveSwitch() {
     </form>
   );
 }
+
+export function BackToSheetsSwitch() {
+  const { pending, res, run } = useAction();
+  const [text, setText] = useState("");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => A.switchToSheetsMode(text));
+      }}
+      className="flex flex-wrap items-end gap-2"
+    >
+      <div>
+        <label className={label} htmlFor="back-sheets">Type BACK TO SHEETS to confirm</label>
+        <input id="back-sheets" value={text} onChange={(e) => setText(e.target.value)} className={`${input} w-56`} autoComplete="off" />
+      </div>
+      <button type="submit" className={btn.secondary} disabled={pending || text.trim().toUpperCase() !== "BACK TO SHEETS"}>
+        {pending && <Loader2 size={14} className="animate-spin" aria-hidden />} Switch back to Google Sheets
+      </button>
+      <Status res={res} />
+    </form>
+  );
+}

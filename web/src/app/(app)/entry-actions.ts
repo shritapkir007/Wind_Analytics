@@ -550,3 +550,32 @@ export async function switchToAppMode(confirmText: string): Promise<Result> {
     return fail(e);
   }
 }
+
+// ------------------------------------------------------------------ switch back to the sheets (trial runs)
+
+/**
+ * Returns to reading the Google Sheets. A full sync then replaces output, attendance, leave, overtime,
+ * inventory, roster and targets with the sheet data, so anything entered in the app while testing is
+ * removed. Manual attendance marks are cleared (they have no place in the sheets). Holidays, tasks,
+ * users, settings and the activity log are kept.
+ */
+export async function switchToSheetsMode(confirmText: string): Promise<Result> {
+  try {
+    const user = await requireRole("admin");
+    if (confirmText.trim().toUpperCase() !== "BACK TO SHEETS") throw new Error("Type BACK TO SHEETS to confirm.");
+    if ((await getDataMode()) !== "app") throw new Error("The app is already reading the Google Sheets.");
+    const db = await getDb();
+    await db.transaction(async (tx) => {
+      await tx.delete(schema.attendanceOverrides);
+      await setDataMode("sheets", user.email, tx as never);
+    });
+    await audit(user.email, "mode", "sheets", "switched", { reason: "back to sheets" });
+    const { runSync } = await import("@/lib/sync/run");
+    const r = await runSync({ mode: "full", trigger: "manual", triggeredBy: user.email });
+    await done(["/data-sources", "/settings"]);
+    if (r.status === "failed") return { ok: true, message: `Back on the Google Sheets, but the sync failed (${r.error ?? "unknown error"}). Run "Sync now" on Data Sources.` };
+    return { ok: true, message: "Back on the Google Sheets. Data reloaded from the sheets." };
+  } catch (e) {
+    return fail(e);
+  }
+}

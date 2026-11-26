@@ -111,3 +111,20 @@ test("phone layout has no horizontal scroll on entry pages", async ({ browser })
     expect(over, p).toBeLessThanOrEqual(0);
   }
 });
+
+test("switch back to the sheets removes test entries, then go live again", async ({ page }) => {
+  await page.goto("/settings#data-entry");
+  await page.getByLabel("Type BACK TO SHEETS to confirm").fill("BACK TO SHEETS");
+  await page.getByRole("button", { name: "Switch back to Google Sheets" }).click();
+  await expect(page.getByText("Currently reading the Google Sheets on every sync.")).toBeVisible({ timeout: 90_000 });
+  // the sheet data is back and the person added during the test is gone
+  await page.goto("/people?all=1");
+  await expect(page.locator("tr", { hasText: "dev.admin@zeitview.com" })).toHaveCount(0);
+  await page.goto("/output");
+  await expect(page.locator("body")).not.toContainText("No data");
+  // and START FRESH works again for the real launch
+  await page.goto("/settings#data-entry");
+  await page.getByLabel("Type START FRESH to confirm").fill("START FRESH");
+  await page.getByRole("button", { name: "Switch to in-app data entry" }).click();
+  await expect(page.getByText("Live: everything is entered in this app")).toBeVisible({ timeout: 60_000 });
+});

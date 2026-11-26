@@ -154,3 +154,5 @@ The app can run on its own, without the Google Sheets. An admin switches it on i
 - **Attendance** (leads): mark a day by hand (e.g. LoP); **Settings**: holidays and targets (admin).
 - The calendar is generated from all of the above; the hourly schedule keeps it rolling 120 days ahead.
 - Every change is in the activity log on **Data Sources**.
+- Trial runs: **Settings → Data entry → Switch back to Google Sheets** (type `BACK TO SHEETS`) reloads
+  everything from the sheets and removes whatever was entered in the app; START FRESH works again after.
