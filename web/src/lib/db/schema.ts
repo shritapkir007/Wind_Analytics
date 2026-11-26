@@ -25,6 +25,11 @@ export const employees = pgTable("employees", {
   section: text("section").notNull().default(""),
   isActive: boolean("is_active").notNull().default(true),
   employeeCode: text("employee_code"),
+  // In-app roster (data mode "app"): weekly days off (0 = Sunday … 6 = Saturday), default place of work.
+  weekOff: integer("week_off").array().notNull().default([0, 6]),
+  workLocation: text("work_location").notNull().default("office"), // office | wfh
+  joinedOn: d("joined_on"),
+  leftOn: d("left_on"),
   hash: text("hash").notNull(),
 });
 
@@ -40,6 +45,8 @@ export const outputSubmissions = pgTable(
     leadNote: text("lead_note"),
     sourceRow: integer("source_row").notNull(),
     entries: jsonb("entries").$type<Record<string, number>>().notNull(),
+    updatedAt: ts("updated_at"),
+    updatedBy: text("updated_by"),
     hash: text("hash").notNull(),
   },
   (t) => [primaryKey({ columns: [t.employeeKey, t.date] }), index("output_date_idx").on(t.date)],
@@ -78,6 +85,8 @@ export const leaveRequests = pgTable("leave_requests", {
   managerNote: text("manager_note").notNull().default(""),
   slackUrl: text("slack_url").notNull().default(""),
   effective: boolean("effective").notNull(),
+  halfDay: text("half_day"), // first | second (in-app requests)
+  createdBy: text("created_by"),
   hash: text("hash").notNull(),
 });
 
@@ -94,6 +103,9 @@ export const deliveryDaily = pgTable(
     duplicates: doublePrecision("duplicates").notNull(),
     lateUploads: doublePrecision("late_uploads").notNull(),
     auditCount: doublePrecision("audit_count").notNull(),
+    deliveredManual: boolean("delivered_manual").notNull().default(false),
+    enteredBy: text("entered_by"),
+    updatedAt: ts("updated_at"),
     hash: text("hash").notNull(),
   },
   (t) => [primaryKey({ columns: [t.stream, t.date] })],
@@ -125,6 +137,11 @@ export const overtimeEntries = pgTable("overtime_entries", {
   turbinesText: text("turbines_text").notNull().default(""),
   turbinesParsed: doublePrecision("turbines_parsed"),
   supervisor: text("supervisor").notNull().default(""),
+  status: text("status").notNull().default("Approved"), // Pending | Approved | Declined (sheet rows are approved)
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: ts("reviewed_at"),
+  reviewComment: text("review_comment"),
+  createdBy: text("created_by"),
   hash: text("hash").notNull(),
 });
 
@@ -228,3 +245,39 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("viewer"), // admin | manager | lead | viewer
   lastLogin: ts("last_login"),
 });
+
+// ---------- In-app data entry (data mode "app") ----------
+
+export const holidays = pgTable("holidays", {
+  date: d("date").primaryKey(),
+  name: text("name").notNull(),
+  createdBy: text("created_by"),
+});
+
+/** Per-person, per-day attendance set by a lead (LoP, Training, Present, WFH, …); wins over generated days. */
+export const attendanceOverrides = pgTable(
+  "attendance_overrides",
+  {
+    employeeKey: text("employee_key").notNull(),
+    date: d("date").notNull(),
+    code: text("code").notNull(),
+    note: text("note").notNull().default(""),
+    setBy: text("set_by").notNull(),
+    setAt: ts("set_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.employeeKey, t.date] })],
+);
+
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: serial("id").primaryKey(),
+    at: ts("at").notNull(),
+    actor: text("actor").notNull(),
+    entity: text("entity").notNull(), // output | leave | overtime | inventory | attendance | employee | holiday | target | mode
+    entityId: text("entity_id").notNull(),
+    action: text("action").notNull(),
+    detail: jsonb("detail"),
+  },
+  (t) => [index("audit_entity_idx").on(t.entity, t.entityId)],
+);

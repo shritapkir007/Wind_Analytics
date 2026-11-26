@@ -7,6 +7,9 @@ import { DataTable } from "@/components/data-table";
 import { isWorkingRequest } from "@/lib/sheets/parsers/leave";
 import { inTeamScope, teamLabel, teamOf, teamTree } from "@/lib/teams";
 import { LeaveCalendar } from "@/components/leave-calendar";
+import { currentUser } from "@/auth";
+import { canActFor, getDataMode, whoAmI } from "@/lib/entry/store";
+import { AttendanceOverrideForm } from "@/components/entry/forms";
 import {
   attendanceFor,
   attendanceSeries,
@@ -84,10 +87,22 @@ export default async function Attendance({ searchParams }: { searchParams: Promi
   const q = (o: Record<string, string | null> = {}) => qs(sp, o);
   const group = (st: string[]) => status.filter((r) => st.includes(r.status));
 
+  const mode = await getDataMode();
+  const me = await whoAmI(await currentUser());
+  const markable = mode === "app" && me.user.role !== "viewer" ? people.filter((e) => e.isActive && canActFor(me, e)).map((e) => ({ key: e.key, name: e.name })) : [];
+
   return (
     <div className="fade-in">
-      <PageHeader title="Attendance & leaves" subtitle={<>Calendar View is the source of truth for attendance · status shown for <strong className="font-medium text-ink">{fmtDate(date, true)}</strong>, totals for {fmtRange(v.from, v.to)}</>} />
+      <PageHeader title="Attendance & leaves" subtitle={<>{mode === "app" ? "Built from the roster, approved requests and lead marks" : "Calendar View is the source of truth for attendance"} · status shown for <strong className="font-medium text-ink">{fmtDate(date, true)}</strong>, totals for {fmtRange(v.from, v.to)}</>} />
       <FilterBar {...barProps} showGrain />
+      {markable.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader title="Mark attendance" subtitle="Set a day by hand (e.g. LoP for an unreported absence, training). This overrides the automatic calendar for that day; choose Automatic to undo." />
+          <CardBody>
+            <AttendanceOverrideForm people={markable} today={ds.today} />
+          </CardBody>
+        </Card>
+      )}
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label={`Present · ${fmtDate(date)}`} value={fmtNum(hc.present, 1)} sub={`of ${hc.active} active · ${hc.wfh} WFH`} delta={{ ...change(hc.present, hcPrev.present), label: `vs ${fmtDate(prev)}` }} formula="Blank, Working or WFH = 1; half-day leave = 0.5 (Calendar View)." />

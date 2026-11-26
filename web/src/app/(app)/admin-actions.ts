@@ -34,6 +34,7 @@ const SettingsForm = z.object({
   noOutputGraceDays: num(0, 14),
   minCoveragePct: num(0, 100),
   minPresentDays: num(0, 31),
+  selfEditDays: num(0, 60),
 });
 
 export async function updateSettings(_: { ok: boolean; error?: string }, fd: FormData) {
@@ -48,6 +49,7 @@ export async function updateSettings(_: { ok: boolean; error?: string }, fd: For
       {
         thresholds: { lowDailyProductivityPct: d.lowDailyProductivityPct, weeklyTargetPct: d.weeklyTargetPct, inventoryRisePct: d.inventoryRisePct, inventoryRiseDays: d.inventoryRiseDays, qualityIssuesMax: d.qualityIssuesMax, noOutputGraceDays: d.noOutputGraceDays },
         ranking: { minCoveragePct: d.minCoveragePct, minPresentDays: d.minPresentDays },
+        entry: { selfEditDays: d.selfEditDays },
         enabledAlerts,
         notifications: {
           ...cur.notifications,

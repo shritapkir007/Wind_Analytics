@@ -1,4 +1,5 @@
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
+import { getDataMode } from "@/lib/entry/store";
 import { ExternalLink, FileSpreadsheet } from "lucide-react";
 import { can, currentUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
@@ -22,8 +23,62 @@ const TABLE_SOURCE: Record<string, string> = {
 
 const ist = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }) : "—");
 
+async function InAppSources({ allowed }: { allowed: boolean }) {
+  const db = await getDb();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const n = async (t: any): Promise<number> => (await db.select({ n: count() }).from(t))[0].n;
+  const [people, output, leave, ot, inv, holidays, overrides, events, runs] = await Promise.all([
+    n(schema.employees),
+    n(schema.outputSubmissions),
+    n(schema.leaveRequests),
+    n(schema.overtimeEntries),
+    n(schema.deliveryDaily),
+    n(schema.holidays),
+    n(schema.attendanceOverrides),
+    db.select().from(schema.auditEvents).orderBy(desc(schema.auditEvents.id)).limit(100),
+    db.select().from(schema.syncRuns).orderBy(desc(schema.syncRuns.id)).limit(1),
+  ]);
+  const tiles: [string, number][] = [["People", people], ["Output entries", output], ["Leave & WFH requests", leave], ["Overtime entries", ot], ["Inventory rows", inv], ["Holidays", holidays], ["Manual attendance marks", overrides]];
+  return (
+    <div className="fade-in">
+      <PageHeader
+        title="Data & activity"
+        subtitle="All data is entered in this app. The calendar and alerts refresh on every change and on the hourly schedule."
+        actions={<SyncButtons allowed={allowed} />}
+      />
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        {tiles.map(([l, v]) => (
+          <Card key={l}>
+            <CardBody>
+              <p className="text-[12px] text-ink-2">{l}</p>
+              <p className="tnum text-[22px] font-semibold text-ink">{v.toLocaleString("en-IN")}</p>
+            </CardBody>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <CardHeader title="Activity log" subtitle={`Latest 100 changes · last calendar refresh ${ist(runs[0]?.finishedAt ?? null)}`} />
+        {events.length === 0 ? (
+          <div className="p-4"><Empty title="No activity yet">Entries, approvals and roster changes are recorded here.</Empty></div>
+        ) : (
+          <DataTable
+            rows={events.map((e) => ({ when: ist(e.at), who: e.actor, what: `${e.entity} · ${e.action}`, ref: e.entityId }))}
+            columns={[
+              { key: "when", header: "When" },
+              { key: "who", header: "By" },
+              { key: "what", header: "Change" },
+              { key: "ref", header: "Record" },
+            ]}
+          />
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export default async function DataSources() {
   const user = await currentUser();
+  if ((await getDataMode()) === "app") return <InAppSources allowed={can(user, "manager")} />;
   const db = await getDb();
   const runs = await db.select().from(schema.syncRuns).orderBy(desc(schema.syncRuns.id)).limit(40);
   const last = runs[0];

@@ -16,6 +16,8 @@ export interface AppSettings {
   thresholds: AlertThresholds;
   enabledAlerts: Record<string, boolean>;
   ranking: { minCoveragePct: number; minPresentDays: number };
+  /** In-app entry: how many past days people may still edit their own output. */
+  entry: { selfEditDays: number };
   notifications: { email: { enabled: boolean; recipients: string[] }; slack: { enabled: boolean; webhookConfigured: boolean }; teams: { enabled: boolean; webhookConfigured: boolean } };
 }
 
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   thresholds: { lowDailyProductivityPct: 60, weeklyTargetPct: 80, inventoryRisePct: 15, inventoryRiseDays: 5, qualityIssuesMax: 150, noOutputGraceDays: 1 },
   enabledAlerts: Object.fromEntries(Object.keys(ALERT_KINDS).map((k) => [k, true])),
   ranking: { minCoveragePct: 70, minPresentDays: 5 },
+  entry: { selfEditDays: 7 },
   notifications: {
     email: { enabled: false, recipients: [] },
     slack: { enabled: false, webhookConfigured: Boolean(process.env.SLACK_WEBHOOK_URL) },
@@ -51,6 +54,7 @@ export async function getSettings(): Promise<AppSettings> {
     thresholds: { ...DEFAULT_SETTINGS.thresholds, ...v.thresholds },
     enabledAlerts: { ...DEFAULT_SETTINGS.enabledAlerts, ...v.enabledAlerts },
     ranking: { ...DEFAULT_SETTINGS.ranking, ...v.ranking },
+    entry: { ...DEFAULT_SETTINGS.entry, ...v.entry },
     notifications: {
       email: { ...DEFAULT_SETTINGS.notifications.email, ...v.notifications?.email },
       slack: { ...DEFAULT_SETTINGS.notifications.slack, enabled: Boolean(v.notifications?.slack?.enabled) },

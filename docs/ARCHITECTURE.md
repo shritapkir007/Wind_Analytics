@@ -389,3 +389,30 @@ Calendar View sections are **sub-teams** grouped into teams (`src/lib/teams.ts`)
 
 The Team filter accepts a whole team or one sub-team. A new section added to Calendar View
 appears as its own team until it is added to the mapping.
+
+## 12. In-app data entry (decision 25 Nov: grow the current app, start fresh, team leads approve)
+
+Settings key `dataMode` = `sheets` (default) or `app`. `switchToAppMode("START FRESH")` (admin) deletes
+output, calendar, leave, delivery, overtime, references, sync issues and alerts, keeps roster, targets,
+users, tasks and settings, and sets the mode. From then on `runSync` no longer reads the sheets: it
+regenerates the calendar and refreshes alerts.
+
+| Data | Entered by | Screen | Table |
+|---|---|---|---|
+| Daily output + extra work | the person (viewer edits own last `entry.selfEditDays` days); leads for their team | My workspace | `output_submissions` (one row per person per day) |
+| Leave / WFH / working-day request | the person, or their lead | My workspace → Approvals | `leave_requests` (Pending → Approved / Declined / Cancelled) |
+| Overtime | the person, or their lead | My workspace → Approvals | `overtime_entries.status` (only Approved counts) |
+| Inventory per stream | lead+ | Inventory | `delivery_daily` (`delivered_manual` false = calculated from FQC output) |
+| Roster | manager+ | People & Teams | `employees` (`week_off`, `work_location`, `joined_on`, `left_on`) |
+| Manual attendance mark | lead+ for their team | Attendance | `attendance_overrides` |
+| Holidays, targets | admin | Settings | `holidays`, `targets` |
+
+**Calendar engine** (`src/lib/domain/calendar-engine.ts`) writes Calendar-View-equivalent codes into
+`calendar_days`, so every KPI keeps working unchanged. Per person and day, first match wins: outside
+join/leave dates → no row; manual mark; holiday (approved OT → Working); week off (approved OT or
+working-day request → Working); approved leave (half day → "First/Second Half X"); approved WFH or
+usual place = home → WFH; else present. Window: 1 Jan of the current year to today + 120 days.
+
+**Permissions**: `canActFor` (self; leads for the same top-level team; managers/admins for all) and
+`canApproveFor` (same, but never your own request unless admin). Every write is in `audit_events`
+and bumps settings `dataVersion`, which invalidates the in-memory dataset cache.

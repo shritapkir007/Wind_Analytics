@@ -6,6 +6,8 @@ import { getDataset } from "@/lib/domain/dataset";
 import { Badge, Card, CardBody, CardHeader, PageHeader, input } from "@/components/ui";
 import { AddUser, RoleSelect, SettingsForm } from "@/components/admin-client";
 import { ALLOWED_DOMAIN } from "@/lib/config";
+import { getDataMode } from "@/lib/entry/store";
+import { GoLiveSwitch, HolidayManager, TargetEditor } from "@/components/entry/forms";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,8 @@ export default async function Settings() {
   const db = await getDb();
   const users = await db.select().from(schema.users).orderBy(desc(schema.users.lastLogin));
   const fieldset = admin ? "" : "pointer-events-none opacity-70";
+  const mode = await getDataMode();
+  const [holidays, targetRows] = await Promise.all([db.select().from(schema.holidays).orderBy(schema.holidays.date), db.select().from(schema.targets).orderBy(schema.targets.method, schema.targets.process)]);
 
   return (
     <div className="fade-in">
@@ -56,6 +60,7 @@ export default async function Settings() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Num name="minCoveragePct" label="Minimum target coverage" value={s.ranking.minCoveragePct} suffix="%" hint="Share of output in processes that have a target" />
                 <Num name="minPresentDays" label="Minimum present days" value={s.ranking.minPresentDays} suffix="days" />
+                <Num name="selfEditDays" label="People can edit their own output for" value={s.entry.selfEditDays} suffix="past days" hint="In-app data entry: older days need a lead" />
               </div>
             </CardBody>
           </Card>
@@ -100,9 +105,59 @@ export default async function Settings() {
         </fieldset>
       </SettingsForm>
 
+      <Card className="mt-6" id="data-entry">
+        <CardHeader
+          title="Data entry"
+          subtitle={mode === "app" ? "Live: everything is entered in this app. The Google Sheets are no longer read." : "Currently reading the Google Sheets on every sync."}
+          actions={mode === "app" ? <Badge tone="good">In-app entry</Badge> : <Badge>Google Sheets</Badge>}
+        />
+        <CardBody>
+          {mode === "sheets" ? (
+            admin ? (
+              <div className="flex flex-col gap-3 text-[13px] text-ink-2">
+                <p>
+                  Switching on in-app entry makes this app the only source: people log their own output, leave and overtime under <strong className="text-ink">My workspace</strong>, leads approve under <strong className="text-ink">Approvals</strong> and record <strong className="text-ink">Inventory</strong>, and managers keep the roster in <strong className="text-ink">People &amp; Teams</strong>.
+                </p>
+                <p>
+                  <strong className="text-critical">Start fresh:</strong> the roster, teams and targets are kept (and become editable here); all output, attendance, leave, overtime and inventory history imported from the sheets is deleted. The sheet sync stops. This can&apos;t be undone from the app.
+                </p>
+                <GoLiveSwitch />
+              </div>
+            ) : (
+              <p className="text-[13px] text-ink-2">An admin can switch on in-app data entry here.</p>
+            )
+          ) : (
+            <div className="grid gap-6 xl:grid-cols-2">
+              <div>
+                <h3 className="mb-2 text-[13px] font-semibold text-ink">Public holidays</h3>
+                <p className="mb-3 text-[12.5px] text-ink-2">Holidays are days off for everyone; overtime approved on a holiday marks it as Working.</p>
+                {admin ? <HolidayManager holidays={holidays} /> : <ul className="text-[13px]">{holidays.map((h) => <li key={h.date}>{h.date} · {h.name}</li>)}</ul>}
+              </div>
+              <div>
+                <h3 className="mb-2 text-[13px] font-semibold text-ink">How the calendar is built</h3>
+                <ul className="list-disc pl-5 text-[12.5px] text-ink-2">
+                  <li>Every active person is present on their working days, at the office or from home as set in People &amp; Teams.</li>
+                  <li>Weekly days off and public holidays are days off; approved overtime or an approved working-day request on them marks the day Working.</li>
+                  <li>Approved leave (full or half day) and WFH requests apply automatically.</li>
+                  <li>A lead can mark a day by hand (e.g. LoP) on the Attendance page; that wins over everything else.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
+        {mode === "app" && admin ? (
+          <Card className="xl:col-span-2">
+            <CardHeader title="Productivity targets" subtitle="Targets per day used for productivity. Process columns are matched to a target by method + process." />
+            <CardBody>
+              <TargetEditor targets={targetRows.map((t) => ({ key: t.key, method: t.method, process: t.process, range: t.range, perDay: t.perDay, minutesPerWtg: t.minutesPerWtg }))} />
+            </CardBody>
+          </Card>
+        ) : null}
         <Card>
-          <CardHeader title="Productivity targets" subtitle="Read from the Target tab on every sync — edit them in the sheet, not here" />
+          <CardHeader title="Productivity targets" subtitle={mode === "app" ? "How each process column resolves to a target" : "Read from the Target tab on every sync — edit them in the sheet, not here"} />
           <CardBody>
             <table className="w-full text-[13px]">
               <thead className="text-left text-[12px] text-ink-2">
@@ -131,10 +186,10 @@ export default async function Settings() {
           <CardHeader title="Users & roles" subtitle={`Sign-in is limited to verified @${ALLOWED_DOMAIN} Google accounts`} />
           <CardBody>
             <dl className="mb-4 grid gap-2 text-[12.5px] text-ink-2 sm:grid-cols-2">
-              <div><dt className="font-medium text-ink">Viewer</dt><dd>Read every dashboard and export reports</dd></div>
-              <div><dt className="font-medium text-ink">Lead</dt><dd>+ create / update tasks, acknowledge alerts</dd></div>
-              <div><dt className="font-medium text-ink">Manager</dt><dd>+ delete tasks, run a manual sync</dd></div>
-              <div><dt className="font-medium text-ink">Admin</dt><dd>+ settings, thresholds and user roles</dd></div>
+              <div><dt className="font-medium text-ink">Viewer</dt><dd>Read every dashboard, export reports; log own output, leave and overtime</dd></div>
+              <div><dt className="font-medium text-ink">Lead</dt><dd>+ tasks, alerts; approve and enter for their team, inventory, attendance marks</dd></div>
+              <div><dt className="font-medium text-ink">Manager</dt><dd>+ delete tasks, manual sync, approve for everyone, roster</dd></div>
+              <div><dt className="font-medium text-ink">Admin</dt><dd>+ settings, roles, holidays, targets, go-live</dd></div>
             </dl>
             {admin && (
               <div className="mb-4">
