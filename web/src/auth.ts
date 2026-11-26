@@ -31,8 +31,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user?.email || trigger === "update" || !token.role || Date.now() / 1000 - Number(token.roleAt ?? 0) > 600) {
         const email = String(user?.email ?? token.email ?? "").toLowerCase();
         if (email) {
-          token.role = await roleFor(email, user?.name ?? token.name);
-          token.roleAt = Math.floor(Date.now() / 1000);
+          try {
+            token.role = await roleFor(email, user?.name ?? token.name);
+            token.roleAt = Math.floor(Date.now() / 1000);
+          } catch (e) {
+            // The database is unreachable or busy: don't fail the sign-in (Auth.js would only say
+            // "Sign-in failed"). Keep the role we had, or the safe default, and retry in a minute;
+            // pages then show the actual database error.
+            console.error("role lookup failed during sign-in", e);
+            token.role = (token.role as Role | undefined) ?? (admins().includes(email) ? "admin" : defaultRole());
+            token.roleAt = Math.floor(Date.now() / 1000) - 540;
+          }
         }
       }
       return token;
