@@ -390,6 +390,17 @@ Calendar View sections are **sub-teams** grouped into teams (`src/lib/teams.ts`)
 The Team filter accepts a whole team or one sub-team. A new section added to Calendar View
 appears as its own team until it is added to the mapping.
 
+## 12a. Productivity targets kept in the app (decision 26 Nov)
+
+Targets no longer come from the Target tab. Settings key `processTargets` holds one range per User
+Input process column (e.g. `Ext_FQC: "10-12"`); the **upper end** is the per-day target (100%).
+Until an admin saves, the table agreed on 26 Nov is used (`src/lib/targets.ts`): Ext Prescreen 19,
+Ext Analysis 7-8, Ext FQC 10-12, Full Internal Inspection 2-3, Int FQC 2-3, Int Pre+Analysis 2-3,
+Data Process 7-8, ZDT Data Process 10, ZDT Pitch Bearing Data Process 13-15, ZDT Prescreen+Analysis 10,
+ZDT Pitch Bearing Prescreen+Analysis 13-15, ZDT FQC 12, ZDT Pitch Bearing FQC 15, Audit 10,
+Skyspecs Data upload 130. Pitch Bearing columns now have their own targets. A process with no range
+is left out of productivity. Applies in both data modes; the Target tab is still synced but unused.
+
 ## 12. In-app data entry (decision 25 Nov: grow the current app, start fresh, team leads approve)
 
 Settings key `dataMode` = `sheets` (default) or `app`. `switchToAppMode("START FRESH")` (admin) deletes

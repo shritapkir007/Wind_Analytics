@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, ExternalLink, Loader2, Plus, Trash2, X } from "lucide-react";
 import * as A from "@/app/(app)/entry-actions";
 import { LEAVE_REQUEST_TYPES, OVERRIDE_CODES, STREAMS, WEEKDAYS } from "@/lib/entry/catalog";
+import { upperEnd } from "@/lib/targets";
 import { btn, input } from "@/components/ui";
 
 type Result = A.Result;
@@ -656,68 +657,60 @@ export function HolidayManager({ holidays }: { holidays: { date: string; name: s
   );
 }
 
-export function TargetEditor({ targets }: { targets: { key: string; method: string; process: string; range: string; perDay: number | null; minutesPerWtg: number | null }[] }) {
+export function ProcessTargetsForm({ rows, editable }: { rows: { column: string; label: string; family: string; range: string }[]; editable: boolean }) {
   const { pending, res, run } = useAction();
+  const [vals, setVals] = useState<Record<string, string>>(() => Object.fromEntries(rows.map((r) => [r.column, r.range])));
   return (
-    <div>
-      <div className="relative overflow-x-auto rounded-xl border border-line">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => A.saveProcessTargets(vals));
+      }}
+    >
+      <div className="relative overflow-x-auto">
         <table className="w-full text-[13px]">
-          <thead className="bg-surface-2 text-[12px] text-ink-2">
+          <thead className="text-left text-[12px] text-ink-2">
             <tr>
-              {["Method", "Process", "Range", "Target / day", "Minutes / WTG", ""].map((h) => (
-                <th key={h} scope="col" className="px-3 py-2 text-left font-medium">{h}</th>
-              ))}
+              <th scope="col" className="pb-2 font-medium">Process</th>
+              <th scope="col" className="pb-2 font-medium">Target range (WTG/day)</th>
+              <th scope="col" className="pb-2 text-right font-medium">100% =</th>
             </tr>
           </thead>
           <tbody>
-            {targets.map((t) => (
-              <tr key={t.key} className="border-t border-line">
-                <td className="px-3 py-1.5">{t.method}</td>
-                <td className="px-3 py-1.5">{t.process}</td>
-                <td className="px-3 py-1.5 text-ink-2">{t.range || "—"}</td>
-                <td className="px-3 py-1.5">
-                  <form
-                    className="flex items-center gap-1"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const f = new FormData(e.currentTarget);
-                      run(() => A.saveTarget({ method: t.method, process: t.process, range: t.range, perDay: Number(f.get("perDay")), minutesPerWtg: t.minutesPerWtg ?? "" }));
-                    }}
-                  >
-                    <label className="sr-only" htmlFor={`t-${t.key}`}>{`Target for ${t.method} ${t.process}`}</label>
-                    <input id={`t-${t.key}`} name="perDay" type="number" step="0.1" min={0.1} defaultValue={t.perDay ?? ""} className="h-8 w-24 rounded-md border border-line-strong bg-surface px-2 text-[13px]" />
-                    <button type="submit" className={btn.ghost} disabled={pending}>Save</button>
-                  </form>
-                </td>
-                <td className="tnum px-3 py-1.5 text-ink-2">{t.minutesPerWtg ?? "—"}</td>
-                <td className="px-3 py-1.5">
-                  <button type="button" className={btn.ghost} aria-label={`Remove ${t.method} ${t.process}`} onClick={() => confirm(`Remove target ${t.method} · ${t.process}?`) && run(() => A.deleteTarget(t.key))}>
-                    <Trash2 size={14} aria-hidden />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const v = vals[r.column] ?? "";
+              const up = upperEnd(v);
+              return (
+                <tr key={r.column} className="border-t border-line">
+                  <td className="py-1.5 pr-3 text-ink">
+                    {r.label}
+                    <span className="block text-[11.5px] text-muted">{r.family}</span>
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    <label className="sr-only" htmlFor={`pt-${r.column}`}>{`Target range for ${r.label}`}</label>
+                    <input
+                      id={`pt-${r.column}`}
+                      value={v}
+                      disabled={!editable}
+                      onChange={(e) => setVals((x) => ({ ...x, [r.column]: e.target.value }))}
+                      placeholder="e.g. 10-12"
+                      className="h-8 w-28 rounded-md border border-line-strong bg-surface px-2 text-[13px] text-ink disabled:opacity-70"
+                    />
+                  </td>
+                  <td className="tnum py-1.5 text-right">{up != null ? up : <span className="text-[12px] text-warning">{v ? "invalid" : "no target"}</span>}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-      <form
-        className="mt-3 flex flex-wrap items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
-          const g = (k: string) => String(f.get(k) ?? "");
-          run(() => A.saveTarget({ method: g("method"), process: g("process"), range: g("range"), perDay: Number(g("perDay")), minutesPerWtg: g("minutes") === "" ? "" : Number(g("minutes")) }), () => (e.target as HTMLFormElement).reset());
-        }}
-      >
-        <div><label className={label} htmlFor="nt-method">Method</label><input id="nt-method" name="method" className={`${input} w-32`} required placeholder="Skyspecs" /></div>
-        <div><label className={label} htmlFor="nt-process">Process</label><input id="nt-process" name="process" className={`${input} w-40`} required placeholder="Data upload" /></div>
-        <div><label className={label} htmlFor="nt-range">Range</label><input id="nt-range" name="range" className={`${input} w-24`} placeholder="35-45" /></div>
-        <div><label className={label} htmlFor="nt-per">Target / day</label><input id="nt-per" name="perDay" type="number" step="0.1" min={0.1} className={`${input} w-28`} required /></div>
-        <div><label className={label} htmlFor="nt-min">Minutes / WTG</label><input id="nt-min" name="minutes" type="number" step="1" min={1} className={`${input} w-28`} /></div>
-        <Submit pending={pending} variant="secondary"><Plus size={14} aria-hidden /> Add target</Submit>
-      </form>
-      <div className="mt-2"><Status res={res} /></div>
-    </div>
+      {editable && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Submit pending={pending}>Save targets</Submit>
+          <Status res={res} />
+        </div>
+      )}
+    </form>
   );
 }
 

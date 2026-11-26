@@ -2,6 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../db";
 import { nowIso } from "../config";
+import { DEFAULT_PROCESS_TARGETS } from "../targets";
 
 export interface AlertThresholds {
   lowDailyProductivityPct: number;
@@ -64,6 +65,23 @@ export async function getSettings(): Promise<AppSettings> {
       teams: { ...DEFAULT_SETTINGS.notifications.teams, enabled: Boolean(v.notifications?.teams?.enabled) },
     },
   };
+}
+
+/** Productivity targets kept in the app (column → range); the built-in table until an admin saves. */
+export async function getProcessTargets(): Promise<{ targets: Record<string, string>; updatedBy: string | null; updatedAt: string | null }> {
+  const db = await getDb();
+  const [row] = await db.select().from(schema.settings).where(eq(schema.settings.key, "processTargets"));
+  const v = row?.value as { targets?: Record<string, string> } | undefined;
+  return v?.targets ? { targets: v.targets, updatedBy: row!.updatedBy, updatedAt: row!.updatedAt } : { targets: DEFAULT_PROCESS_TARGETS, updatedBy: null, updatedAt: null };
+}
+
+export async function saveProcessTargets(targets: Record<string, string>, by: string) {
+  const db = await getDb();
+  const value = { targets };
+  await db
+    .insert(schema.settings)
+    .values({ key: "processTargets", value, updatedBy: by, updatedAt: nowIso() })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedBy: by, updatedAt: nowIso() } });
 }
 
 export async function saveSettings(next: AppSettings, by: string) {

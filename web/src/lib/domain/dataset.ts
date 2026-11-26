@@ -3,7 +3,7 @@ import { desc, inArray } from "drizzle-orm";
 import { getDb, schema, withDbTimeout } from "../db";
 import { todayIST } from "../config";
 import { buildDataset, RANKING_RULES, type Dataset, type Task } from "./metrics";
-import { getSettings } from "./settings";
+import { getProcessTargets, getSettings } from "./settings";
 import { getDataMode, getDataVersion } from "../entry/store";
 import type { CalendarDay, DayCategory, Stream } from "../types";
 
@@ -96,10 +96,10 @@ export async function getDataset(): Promise<Dataset> {
     if (!g.__windLoading) g.__windLoading = loadBase(runId, version, mode, today).finally(() => (g.__windLoading = undefined));
     c = g.__windData = await g.__windLoading;
   }
-  const [tasks, settings] = await withDbTimeout(Promise.all([loadTasks(), getSettings()]), "loading tasks and settings");
+  const [tasks, settings, pt] = await withDbTimeout(Promise.all([loadTasks(), getSettings(), getProcessTargets()]), "loading tasks and settings");
   RANKING_RULES.minCoveragePct = settings.ranking.minCoveragePct;
   RANKING_RULES.minPresentDays = settings.ranking.minPresentDays;
-  return buildDataset({ ...c.base, today, tasks });
+  return buildDataset({ ...c.base, today, tasks, appTargets: pt.targets });
 }
 
 export function invalidateDataset() {

@@ -80,7 +80,7 @@ export default async function Output({ searchParams }: { searchParams: Promise<S
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard label="Output" value={fmtNum(out.totalSteps)} unit="steps" sub={`${out.people} people · ${out.submissions} entries`} delta={{ ...change(out.totalSteps, outPrev.totalSteps), label: `vs ${fmtRange(cmp.from, cmp.to)}` }} formula="Σ of all process quantities in User Input. One turbine through Prescreen, Analysis and FQC = 3 steps." />
-        <KpiCard label="Target-days earned" value={fmtNum(out.targetDays, 1)} sub={`${fmtPct(out.totalSteps ? (out.targetedQty / out.totalSteps) * 100 : null)} of output has a target`} delta={{ ...change(out.targetDays, outPrev.targetDays), label: "vs previous period" }} formula="Σ quantity ÷ that process's Average WTG/Day from the Target tab, for processes counted in productivity." />
+        <KpiCard label="Target-days earned" value={fmtNum(out.targetDays, 1)} sub={`${fmtPct(out.totalSteps ? (out.targetedQty / out.totalSteps) * 100 : null)} of output has a target`} delta={{ ...change(out.targetDays, outPrev.targetDays), label: "vs previous period" }} formula="Σ quantity ÷ that process's target per day (upper end of its range in Settings), for processes counted in productivity." />
         <KpiCard label="Team productivity" value={fmtPct(totals.productivityPct)} sub={`${fmtNum(totals.presentDays, 1)} present days`} delta={{ ...change(totals.productivityPct, totalsPrev.productivityPct), label: "vs previous period", suffix: " pts" }} tone={totals.productivityPct != null && totals.productivityPct < 80 ? "warning" : "default"} formula="Target-days earned ÷ present days (Calendar View)." />
         <KpiCard label="Target vs actual" value={fmtPct(totals.targetAchievementPct)} sub={`${fmtNum(totals.targetQtyActual)} of ${fmtNum(totals.targetQtyExpected)} expected`} href="#targets" />
         <KpiCard label="Delivered" value={fmtNum(sum(del, "delivered"))} unit="WTG" sub="Active ZV" delta={{ ...change(sum(del, "delivered"), sum(delPrev, "delivered")), label: "vs previous period" }} href="#deliveries" />
@@ -105,7 +105,7 @@ export default async function Output({ searchParams }: { searchParams: Promise<S
       </div>
 
       <Card id="targets" className="mb-4">
-        <CardHeader title="Target vs actual by process" subtitle="Targets read live from the Target tab (Average WTG/Day)" info="Expected = target/day × present days spent on the process. A present day is split across the processes logged that day in proportion to their target-day share. Output on a week-off or leave day adds actual but no expected work." />
+        <CardHeader title="Target vs actual by process" subtitle="Targets from Settings → Productivity targets (upper end of each range)" info="Expected = target/day × present days spent on the process. A present day is split across the processes logged that day in proportion to their target-day share. Output on a week-off or leave day adds actual but no expected work." />
         <CardBody>
           {targets.length === 0 ? (
             <Empty title="No targeted output in this period" />

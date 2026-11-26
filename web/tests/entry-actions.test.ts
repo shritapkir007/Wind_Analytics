@@ -219,3 +219,20 @@ describe("roster", () => {
     expect(sat).toMatchObject({ rawCode: "WFH" });
   });
 });
+
+describe("productivity targets", () => {
+  it("defaults to the agreed table, admins edit ranges, upper end counts", async () => {
+    let ds = await getDataset();
+    expect(ds.processes.get("Ext_FQC")!.target.perDay).toBe(12);
+    as("lead.wind@zeitview.com", "lead");
+    expect((await A.saveProcessTargets({ Ext_FQC: "10-14" })).error).toMatch(/admin/);
+    as("admin@zeitview.com", "admin");
+    expect((await A.saveProcessTargets({ Ext_FQC: "12-10" })).error).toMatch(/low to high/);
+    expect((await A.saveProcessTargets({ Ext_FQC: "ten" })).error).toMatch(/range like 10-12/);
+    expect((await A.saveProcessTargets({ "Critical Review": "5" })).error).toMatch(/Unknown process/);
+    expect(await A.saveProcessTargets({ Ext_FQC: "10 - 14", "ZDT FQC": "12" })).toMatchObject({ ok: true });
+    ds = await getDataset();
+    expect(ds.processes.get("Ext_FQC")!.target).toMatchObject({ perDay: 14, range: "10-14" });
+    expect(ds.processes.get("Ext_Analysis")!.target.perDay).toBeNull(); // not in the saved table
+  });
+});

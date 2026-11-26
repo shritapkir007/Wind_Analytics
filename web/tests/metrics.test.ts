@@ -101,3 +101,21 @@ describe("periods & deliveries", () => {
     expect(ext).toMatchObject({ delivered: 106, inventory: 216, qualityIssues: 106, asOf: "2026-01-09" });
   });
 });
+
+describe("targets kept in the app (decision 26 Nov)", () => {
+  it("uses the upper end of each range and ignores the Target tab", async () => {
+    const { upperEnd, DEFAULT_PROCESS_TARGETS } = await import("@/lib/targets");
+    expect([upperEnd("10-12"), upperEnd("19"), upperEnd(" 2 - 3 "), upperEnd("2.5-3.5"), upperEnd(""), upperEnd("abc"), upperEnd("0")]).toEqual([12, 19, 3, 3.5, null, null, null]);
+    const app = buildDataset({ today: "2026-01-08", employees: [emp(A)], submissions: [sub(A, "2026-01-05", { Ext_FQC: 12, "ZDT Pitch Beraring FQC": 15, "Critical Review": 4 })], calendar, leave: [], delivery: [], targets, overtime: [], references: [], tasks: [], appTargets: DEFAULT_PROCESS_TARGETS });
+    const t = (c: string) => app.processes.get(c)!.target;
+    expect(t("Ext_FQC")).toMatchObject({ perDay: 12, range: "10-12" }); // not the Target tab's 11
+    expect(t("ZDT Pitch Beraring FQC").perDay).toBe(15); // own target, no longer ZDT FQC's
+    expect(t("Skyspecs Data upload").perDay).toBe(130);
+    expect(t("Full Internal Inspection(P+A+FQC)").perDay).toBe(3);
+    expect(t("Critical Review").perDay).toBeNull(); // still excluded
+    expect(employeePerformance(app, A, { from: "2026-01-05", to: "2026-01-05" }).output.targetDays).toBeCloseTo(2);
+    // a process with its range cleared drops out of productivity
+    const none = buildDataset({ today: "2026-01-08", employees: [], submissions: [], calendar: [], leave: [], delivery: [], targets, overtime: [], references: [], tasks: [], appTargets: { Ext_FQC: "" } });
+    expect(none.processes.get("Ext_FQC")!.counts).toBe(false);
+  });
+});
