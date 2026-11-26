@@ -23,6 +23,8 @@ import { parseEmployeeIds, parseOvertime } from "../sheets/parsers/overtime";
 import { PROCESSES } from "../processes";
 import { applyWorkingRequests, fuzzyNameLookup, linkNamelessRows } from "./identity";
 import { isActiveSection } from "../teams";
+import { parsePipeline, parsePriority, type PipelineRow, type PrioritySiteRow } from "../sheets/parsers/inventory";
+import { todayIST, WORKBOOKS } from "../config";
 
 export interface Snapshot {
   employees?: Employee[];
@@ -33,6 +35,8 @@ export interface Snapshot {
   delivery?: DeliveryDay[];
   targets?: TargetRow[];
   overtime?: OvertimeEntry[];
+  pipeline?: PipelineRow[];
+  priority?: PrioritySiteRow[];
   references: Reference[];
   issues: Issue[];
   /** Rows read per "workbook/tab". */
@@ -53,6 +57,7 @@ export async function collect(source: SheetSource, mode: "quick" | "full"): Prom
     workstudy: ["User Input", "Active ZV", "Target", "Employee List"],
     leave: ["Calendar View", "Leave Tracker", "Tracker", "Dashboard"],
     overtime: ["Wind OT tracker 2026", "Employee ID"],
+    inventory: [...WORKBOOKS.inventory.tabs],
   };
 
   await Promise.all(
@@ -79,6 +84,17 @@ export async function collect(source: SheetSource, mode: "quick" | "full"): Prom
       return undefined;
     }
   };
+
+  // ---- Wind-Inventory Count: pipeline stages per tracker + priority sites ----
+  const inv = grids.inventory;
+  if (inv) {
+    const p = guard("inventory/trackers", () => parsePipeline(inv, todayIST()));
+    if (p) {
+      snap.pipeline = p.rows;
+      snap.issues.push(...p.issues);
+    }
+    snap.priority = guard("inventory/Priority", () => parsePriority(inv["Priority"]));
+  }
 
   // ---- Leave workbook: roster + attendance + requests ----
   const lv = grids.leave;

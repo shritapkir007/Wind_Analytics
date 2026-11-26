@@ -11,6 +11,8 @@ import {
   PencilLine,
   UserCog,
   CalendarCheck2,
+  ChevronDown,
+  Gauge,
   ChevronsLeft,
   ChevronsRight,
   Database,
@@ -33,19 +35,24 @@ const RANKS: Record<string, number> = { viewer: 0, lead: 1, manager: 2, admin: 3
 const atLeast = (n: NavInfo, r: string) => (RANKS[n.role] ?? 0) >= RANKS[r];
 
 const NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/me", label: "My workspace", icon: PencilLine, show: (n) => n.mode === "app" },
   { href: "/approvals", label: "Approvals", icon: CheckCheck, show: (n) => n.mode === "app" && atLeast(n, "lead") },
+  { href: "/inventory", label: "Inventory", icon: Boxes, show: (n) => n.mode === "app" && atLeast(n, "lead") },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/alerts", label: "Alerts", icon: Bell },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+/** Detailed pages, folded under "More" so the sidebar stays short. */
+const MORE: NavItem[] = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/attendance", label: "Attendance & Leaves", icon: CalendarCheck2 },
   { href: "/output", label: "Output & Deliveries", icon: PackageCheck },
-  { href: "/inventory", label: "Inventory", icon: Boxes, show: (n) => n.mode === "app" && atLeast(n, "lead") },
-  { href: "/tasks", label: "Task Management", icon: ListChecks },
+  { href: "/tasks", label: "Tasks", icon: ListChecks },
   { href: "/employees", label: "Employee Performance", icon: Users },
-  { href: "/reports", label: "Reports & Analytics", icon: BarChart3 },
-  { href: "/alerts", label: "Alerts & Notifications", icon: Bell },
   { href: "/people", label: "People & Teams", icon: UserCog, show: (n) => atLeast(n, "manager") },
-  { href: "/data-sources", label: "Data Sources & Integrations", icon: Database },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/data-sources", label: "Data & Activity", icon: Database },
 ];
 
 const KEEP = ["preset", "from", "to", "section", "employee"];
@@ -59,31 +66,60 @@ function NavLinks({ collapsed, alertCount, nav, onNavigate }: { collapsed: boole
     if (v) keep.set(k, v);
   }
   const q = keep.toString();
+  const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
+  const more = MORE.filter((n) => !n.show || n.show(nav));
+  const inMore = more.some((m) => isActive(m.href));
+  const [openMore, setOpenMore] = useState(false);
+  useEffect(() => {
+    try {
+      setOpenMore(localStorage.getItem("wind.more") === "open");
+    } catch {}
+  }, []);
+  const showMore = openMore || inMore;
+  const toggleMore = () =>
+    setOpenMore((o) => {
+      try {
+        localStorage.setItem("wind.more", o ? "closed" : "open");
+      } catch {}
+      return !o;
+    });
+  const item = ({ href, label, icon: Icon }: NavItem) => {
+    const active = isActive(href);
+    return (
+      <Link
+        key={href}
+        href={`${href}${q ? `?${q}` : ""}`}
+        onClick={onNavigate}
+        title={collapsed ? label : undefined}
+        aria-current={active ? "page" : undefined}
+        className={`group relative flex h-10 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition ${active ? "bg-sidebar-2 text-white" : "text-sidebar-ink hover:bg-sidebar-2/70 hover:text-white"}`}
+      >
+        {active && <span className="absolute top-2 bottom-2 left-0 w-[3px] rounded-r bg-[var(--s1)]" aria-hidden />}
+        <Icon size={18} className="shrink-0" aria-hidden />
+        {!collapsed && <span className="truncate">{label}</span>}
+        {href === "/approvals" && nav.pending > 0 && (
+          <span className={`tnum ml-auto rounded-full bg-warning px-1.5 text-[11px] leading-5 font-semibold text-ink ${collapsed ? "absolute top-1 right-1 px-1 text-[10px] leading-4" : ""}`}>{nav.pending > 99 ? "99+" : nav.pending}</span>
+        )}
+        {href === "/alerts" && alertCount > 0 && (
+          <span className={`tnum ml-auto rounded-full bg-critical px-1.5 text-[11px] leading-5 font-semibold text-white ${collapsed ? "absolute top-1 right-1 px-1 text-[10px] leading-4" : ""}`}>{alertCount > 99 ? "99+" : alertCount}</span>
+        )}
+      </Link>
+    );
+  };
   return (
     <nav aria-label="Main" className="flex flex-col gap-0.5 px-2">
-      {NAV.filter((n) => !n.show || n.show(nav)).map(({ href, label, icon: Icon }) => {
-        const active = path === href || path.startsWith(`${href}/`);
-        return (
-          <Link
-            key={href}
-            href={`${href}${q ? `?${q}` : ""}`}
-            onClick={onNavigate}
-            title={collapsed ? label : undefined}
-            aria-current={active ? "page" : undefined}
-            className={`group relative flex h-10 items-center gap-3 rounded-lg px-3 text-[13.5px] font-medium transition ${active ? "bg-sidebar-2 text-white" : "text-sidebar-ink hover:bg-sidebar-2/70 hover:text-white"}`}
-          >
-            {active && <span className="absolute top-2 bottom-2 left-0 w-[3px] rounded-r bg-[var(--s1)]" aria-hidden />}
-            <Icon size={18} className="shrink-0" aria-hidden />
-            {!collapsed && <span className="truncate">{label}</span>}
-            {href === "/approvals" && nav.pending > 0 && (
-              <span className={`tnum ml-auto rounded-full bg-warning px-1.5 text-[11px] leading-5 font-semibold text-ink ${collapsed ? "absolute top-1 right-1 px-1 text-[10px] leading-4" : ""}`}>{nav.pending > 99 ? "99+" : nav.pending}</span>
-            )}
-            {href === "/alerts" && alertCount > 0 && (
-              <span className={`tnum ml-auto rounded-full bg-critical px-1.5 text-[11px] leading-5 font-semibold text-white ${collapsed ? "absolute top-1 right-1 px-1 text-[10px] leading-4" : ""}`}>{alertCount > 99 ? "99+" : alertCount}</span>
-            )}
-          </Link>
-        );
-      })}
+      {NAV.filter((n) => !n.show || n.show(nav)).map(item)}
+      <button
+        type="button"
+        onClick={toggleMore}
+        aria-expanded={showMore}
+        className="mt-3 flex h-8 items-center gap-2 rounded-lg px-3 text-[11.5px] font-semibold tracking-wide text-sidebar-ink/70 uppercase hover:text-white"
+        title={collapsed ? "More pages" : undefined}
+      >
+        <ChevronDown size={14} className={`shrink-0 transition ${showMore ? "" : "-rotate-90"}`} aria-hidden />
+        {!collapsed && "More"}
+      </button>
+      {showMore && more.map(item)}
     </nav>
   );
 }

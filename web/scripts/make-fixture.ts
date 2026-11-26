@@ -263,10 +263,43 @@ const dashboard = [[dmy(TODAY)], ["", "Employee Leave Requests Dashboard"], [], 
   ["", "", "", "", "", "", "", "", "", "", "", "Request from", "count Workflow ID", "", "Request from", "count Workflow ID"],
   ["", "", "", "", "", "", "", "", "", "", "", people[0].email, "31", "", people[1].email, "30"]];
 
+// ---------------- Wind-Inventory Count (one tab per Asana tracker + Priority) ----------------
+// Bases are the real counts of 26 Nov 2026; earlier days drift around them. Sundays and future days
+// are left at zero, like the sheet (it has a row for every day of the year).
+const INV: [string, [string, number][]][] = [
+  ["Asana - Wind Analytics Daily Tracker", [["Prescreen", 79], ["ZV Analysis", 1396], ["Accurance Analysis", 80], ["FQC", 420], ["Quality Issues", 146], ["Total", -1], ["Nordex analysis ", 71], ["Nordex FQC ", 8]]],
+  ["Asana - External Quality Issues", [["Engineering - Needs review", 40], ["Ops - Action needed", 96], ["Ready for Analysis", 3], ["Product Related Issue ", 0], ["Total", -1]]],
+  ["Asana - Internal Blade Analytics Daily Tracker", [["Prescreen+Analysis", 100], ["FQC", 16], ["Quality Issues", 67]]],
+  ["Asana - Internal Data Process Tracker", [["Pending Upload", 49], ["Data Avl to Download", 30], ["In-Preprocessing", 65], ["Pilot Uploader", 78]]],
+  ["Asana - ZDT Analytics Daily Tracker", [["Prescreen+Analysis", 43], ["FQC", 32], ["Quality Issues", 0]]],
+  ["ZDT Data Process", [["ZDT Pre - Processing", 90], ["ZDT Pilot uploader", 1]]],
+  ["ZV-Skyspecs- GE Upload Tracker", [["Yet to Upload Data", 0], ["In Progress", 2273], ["Issue/Error", 980]]],
+];
+const invTabs: Record<string, string[][]> = {};
+const yearDays: string[] = [];
+for (let d = `${TODAY.slice(0, 4)}-01-01`; d <= `${TODAY.slice(0, 4)}-12-31`; d = addDays(d, 1)) yearDays.push(d);
+for (const [tab, cols] of INV) {
+  const grid: string[][] = [[tab], [], ["Month", "Date", "Day", "Week", ...cols.map(([h]) => h)]];
+  for (const d of yearDays) {
+    const off = d > TODAY || wd(d) === 0 || HOLIDAYS.has(d);
+    const ageDays = (Date.parse(TODAY) - Date.parse(d)) / 864e5;
+    const vals = cols.map(([, base]) => (base < 0 || off ? 0 : Math.max(0, Math.round(base * (1 + Math.sin(ageDays / 9) * 0.12 + (rnd() - 0.5) * 0.08)))));
+    const total = vals.reduce((a, b) => a + b, 0);
+    grid.push([MONTH_FULL[+d.slice(5, 7) - 1], dmy(d), WD[wd(d)].slice(0, 3), String(Math.ceil((+d.slice(8, 10)) / 7)), ...cols.map(([, base], i) => (base < 0 ? String(off ? 0 : total) : String(vals[i])))]);
+  }
+  invTabs[tab] = grid;
+}
+invTabs["Priority"] = [[], ["Date:"], [TODAY], ["Priority Site", "Number of Wtgs Active", "Customer", "Prescreen", "Analysis", "FQC", "Request from - Ops Coordinator", "SLA", "Status", "Comments", "ETD"],
+  ["Foard City", "0", "GE", "-", "-", "-", "Camron", "--", "Complete", "DONE", "15-11-2026"],
+  ["Ouro Branco", "0", "Vestas", "", "0", "0", "Gabriel Alves", "--", "Complete", "DONE", "18-11-2026"],
+  ["Crookwell 2", "24", "GE", "6", "10", "8", "Daniel AU", "48h", "In progress", "Analysis running", dmy(addDays(TODAY, 2))],
+  ["Diamond Trail Expansion", "18", "GE", "18", "0", "0", "Camron", "72h", "Not started", "", dmy(addDays(TODAY, 4))]];
+
 const out = {
   workstudy: { "User Input": ui, "Active ZV": zv, Target: target, "Employee List": employeeList, ...pivotTabs },
   leave: { "Calendar View": calendarGrid, "Leave Tracker": leaveTracker, Tracker: tracker, Dashboard: dashboard },
   overtime: { "Wind OT tracker 2026": ot, "Employee ID": employeeIds },
+  inventory: invTabs,
 };
 mkdirSync(path.dirname(OUT), { recursive: true });
 writeFileSync(OUT, JSON.stringify(out));

@@ -236,3 +236,38 @@ describe("productivity targets", () => {
     expect(ds.processes.get("Ext_Analysis")!.target.perDay).toBeNull(); // not in the saved table
   });
 });
+
+describe("wind inventory pipeline", () => {
+  it("leads record daily stage counts; the dashboard view carries the latest day and its change", async () => {
+    const { buildPipeline } = await import("@/lib/domain/pipeline");
+    as("asha@zeitview.com", "viewer");
+    expect((await A.savePipeline({ date: "2026-11-24", counts: { ext: { fqc: 400 } } })).error).toMatch(/lead/);
+    as("lead.wind@zeitview.com", "lead");
+    expect((await A.savePipeline({ date: "2026-11-26", counts: { ext: { fqc: 1 } } })).error).toMatch(/future/);
+    expect((await A.savePipeline({ date: "2026-11-24", counts: { ext: { nope: 1 } } })).error).toMatch(/Unknown stage/);
+    expect((await A.savePipeline({ date: "2026-11-24", counts: { ext: { fqc: -3 } } })).error).toMatch(/negative/);
+    expect(await A.savePipeline({ date: "2026-11-24", counts: { ext: { prescreen: 80, fqc: 400, quality_issues: 140 }, zdt: { fqc: 30 } } })).toMatchObject({ ok: true });
+    expect(await A.savePipeline({ date: "2026-11-25", counts: { ext: { prescreen: 79, fqc: 420, quality_issues: 146 } } })).toMatchObject({ ok: true });
+    const db = await getDb();
+    const view = buildPipeline(await db.select().from(schema.pipelineCounts), "2026-11-25");
+    const ext = view.find((t) => t.tracker.id === "ext")!;
+    expect(ext).toMatchObject({ asOf: "2026-11-25", prevDate: "2026-11-24", total: 645, prevTotal: 620, updatedBy: "lead.wind@zeitview.com" });
+    expect(ext.stages.find((s) => s.id === "fqc")).toMatchObject({ count: 420, prev: 400 });
+    // ZDT was only counted on the 24th: it carries forward with no previous day
+    expect(view.find((t) => t.tracker.id === "zdt")).toMatchObject({ asOf: "2026-11-24", total: 30, prevTotal: null });
+  });
+
+  it("keeps a priority-site list", async () => {
+    as("lead.wind@zeitview.com", "lead");
+    expect((await A.savePrioritySite({ site: "X" })).error).toMatch(/site name/);
+    const r = await A.savePrioritySite({ site: "Crookwell 2", customer: "GE", wtgs: "24", status: "In progress", etd: "2026-11-28" });
+    expect(r).toMatchObject({ ok: true });
+    const db = await getDb();
+    const [s] = await db.select().from(schema.prioritySites);
+    expect(s).toMatchObject({ site: "Crookwell 2", wtgs: 24, etd: "2026-11-28", updatedBy: "lead.wind@zeitview.com" });
+    expect(await A.savePrioritySite({ id: s.id, site: "Crookwell 2", status: "Complete" })).toMatchObject({ ok: true });
+    expect((await db.select().from(schema.prioritySites))[0].status).toBe("Complete");
+    expect(await A.deletePrioritySite(s.id)).toMatchObject({ ok: true });
+    expect(await db.select().from(schema.prioritySites)).toHaveLength(0);
+  });
+});

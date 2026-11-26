@@ -790,3 +790,156 @@ export function ZohoLeave({ id, url, applied }: { id: string; url: string; appli
     </span>
   );
 }
+
+// ------------------------------------------------------------------ wind inventory pipeline
+
+export interface PipelineFormTracker {
+  id: string;
+  label: string;
+  unit: string;
+  from: string | null;
+  stages: { id: string; label: string; value: number | null }[];
+}
+
+/** Daily stage counts. Prefilled with the latest saved counts, so only changes need typing. */
+export function PipelineForm({ date, today, trackers }: { date: string; today: string; trackers: PipelineFormTracker[] }) {
+  const router = useRouter();
+  const { pending, res, run } = useAction();
+  const [vals, setVals] = useState<Record<string, Record<string, string>>>(() =>
+    Object.fromEntries(trackers.map((t) => [t.id, Object.fromEntries(t.stages.map((s) => [s.id, s.value == null ? "" : String(s.value)]))])),
+  );
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const counts = Object.fromEntries(
+          Object.entries(vals).map(([t, st]) => [t, Object.fromEntries(Object.entries(st).filter(([, v]) => v !== "").map(([k, v]) => [k, Number(v)]))]),
+        );
+        run(() => A.savePipeline({ date, counts }));
+      }}
+    >
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="w-44">
+          <label className={label} htmlFor="pl-date">Count date</label>
+          <input id="pl-date" type="date" className={input} value={date} max={today} onChange={(e) => router.push(`/inventory?date=${e.target.value}`)} />
+        </div>
+        <p className="pb-2 text-[12.5px] text-ink-2">Each box starts with the last saved count. Change only what moved, then save once for all trackers.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {trackers.map((t) => {
+          const total = Object.values(vals[t.id]).reduce((a, v) => a + (Number(v) || 0), 0);
+          return (
+            <fieldset key={t.id} className="rounded-xl border border-line p-3">
+              <legend className="px-1 text-[13px] font-semibold text-ink">{t.label}</legend>
+              <p className="mb-2 text-[11.5px] text-muted">
+                {t.from === date ? "Saved for this day" : t.from ? `Carried forward from ${t.from}` : "No count yet"} · total <span className="tnum font-medium text-ink">{total.toLocaleString("en-IN")}</span> {t.unit}
+              </p>
+              <div className="grid gap-2">
+                {t.stages.map((s) => {
+                  const v = vals[t.id][s.id];
+                  const d = v !== "" && s.value != null ? Number(v) - s.value : 0;
+                  return (
+                    <div key={s.id} className="flex items-center gap-2">
+                      <label htmlFor={`pl-${t.id}-${s.id}`} className="min-w-0 flex-1 truncate text-[12.5px] text-ink-2">{s.label}</label>
+                      {d !== 0 && <span className={`tnum text-[11.5px] ${d > 0 ? "text-warning" : "text-good"}`}>{d > 0 ? `+${d}` : d}</span>}
+                      <input
+                        id={`pl-${t.id}-${s.id}`}
+                        type="number"
+                        min={0}
+                        step="1"
+                        inputMode="numeric"
+                        className="h-8 w-24 rounded-md border border-line-strong bg-surface px-2 text-right text-[13px] text-ink"
+                        value={v}
+                        onChange={(e) => setVals((x) => ({ ...x, [t.id]: { ...x[t.id], [s.id]: e.target.value } }))}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Submit pending={pending}>Save counts for {date}</Submit>
+        <Status res={res} />
+      </div>
+    </form>
+  );
+}
+
+export interface PrioritySiteValue {
+  id?: string;
+  site: string;
+  wtgs: number | null;
+  customer: string;
+  prescreen: string;
+  analysis: string;
+  fqc: string;
+  requestedBy: string;
+  sla: string;
+  status: string;
+  comments: string;
+  etd: string | null;
+}
+
+export function PrioritySiteForm({ value, statuses, onDone }: { value?: PrioritySiteValue; statuses: readonly string[]; onDone?: () => void }) {
+  const { pending, res, run } = useAction();
+  const v = value ?? { site: "", wtgs: null, customer: "", prescreen: "", analysis: "", fqc: "", requestedBy: "", sla: "", status: statuses[0], comments: "", etd: null };
+  const k = v.id ?? "new";
+  const f = (name: keyof PrioritySiteValue, text: string, extra: Record<string, unknown> = {}) => (
+    <div>
+      <label className={label} htmlFor={`ps-${k}-${name}`}>{text}</label>
+      <input id={`ps-${k}-${name}`} name={name} defaultValue={v[name] == null ? "" : String(v[name])} className={input} {...extra} />
+    </div>
+  );
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        const g = (n: string) => String(fd.get(n) ?? "");
+        run(
+          () => A.savePrioritySite({ id: v.id, site: g("site"), wtgs: g("wtgs"), customer: g("customer"), prescreen: g("prescreen"), analysis: g("analysis"), fqc: g("fqc"), requestedBy: g("requestedBy"), sla: g("sla"), status: g("status"), comments: g("comments"), etd: g("etd") }),
+          () => {
+            if (!v.id) (e.target as HTMLFormElement).reset();
+            onDone?.();
+          },
+        );
+      }}
+      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+    >
+      {f("site", "Site", { required: true, minLength: 2 })}
+      {f("customer", "Customer", { placeholder: "GE, Vestas…" })}
+      {f("wtgs", "WTGs active", { type: "number", min: 0 })}
+      {f("requestedBy", "Requested by (Ops)")}
+      {f("prescreen", "Prescreen")}
+      {f("analysis", "Analysis")}
+      {f("fqc", "FQC")}
+      {f("sla", "SLA", { placeholder: "e.g. 48h" })}
+      <div>
+        <label className={label} htmlFor={`ps-${k}-status`}>Status</label>
+        <select id={`ps-${k}-status`} name="status" defaultValue={v.status || statuses[0]} className={input}>
+          {[...new Set([...statuses, v.status].filter(Boolean))].map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+      {f("etd", "ETD", { type: "date" })}
+      <div className="sm:col-span-2">{f("comments", "Comments")}</div>
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
+        <Submit pending={pending}>{v.id ? "Save site" : "Add priority site"}</Submit>
+        <Status res={res} />
+      </div>
+    </form>
+  );
+}
+
+export function DeletePrioritySite({ id, site }: { id: string; site: string }) {
+  const { pending, run } = useAction();
+  return (
+    <button type="button" className={btn.ghost} disabled={pending} aria-label={`Remove ${site}`} onClick={() => confirm(`Remove ${site} from the priority list?`) && run(() => A.deletePrioritySite(id))}>
+      <Trash2 size={14} aria-hidden />
+    </button>
+  );
+}

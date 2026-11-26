@@ -77,6 +77,8 @@ export async function runSync(opts: {
       ["delivery", schema.deliveryDaily, ["stream", "date"], snap.delivery as never],
       ["targets", schema.targets, ["key"], snap.targets as never],
       ["overtime", schema.overtimeEntries, ["rowKey"], snap.overtime as never],
+      ["pipeline", schema.pipelineCounts, ["tracker", "stage", "date"], snap.pipeline as never],
+      ["priority", schema.prioritySites, ["id"], snap.priority as never],
     ];
     for (const [name, table, keys, rows] of plan) {
       if (!rows) {

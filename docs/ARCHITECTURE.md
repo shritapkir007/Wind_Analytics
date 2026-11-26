@@ -427,3 +427,35 @@ usual place = home → WFH; else present. Window: 1 Jan of the current year to t
 **Permissions**: `canActFor` (self; leads for the same top-level team; managers/admins for all) and
 `canApproveFor` (same, but never your own request unless admin). Every write is in `audit_events`
 and bumps settings `dataVersion`, which invalidates the in-memory dataset cache.
+
+## 13. One-page Dashboard and the inventory pipeline (decision 26 Nov)
+
+`/` opens **/dashboard**, a single "command center" page that auto-refreshes every 60 s:
+hero (date, people today, productivity, latest output day, approvals/alerts), **inventory
+pipeline** (one card per Asana tracker: total, change since the previous count, 60-day trend,
+every stage), priority sites, work logged per process (never added across processes),
+attendance + upcoming leave, productivity by team + top performers, deliveries and alerts.
+The sidebar shows Dashboard, My workspace, Approvals, Inventory, Reports, Alerts, Settings;
+the detailed pages sit under "More".
+
+**Source: "Wind-Inventory Count – 2026"** (`1Xad0Er1…`, env `SHEET_INVENTORY_ID` overrides the
+built-in ID). Tabs read: the 7 tracker tabs and `Priority` (Summary, Headcount, Log-In and
+Asana Sections are not read: the dashboard recomputes them, and the app logs who changed what).
+
+| Tracker (tab) | Stages |
+|---|---|
+| External Blade Analytics (Asana - Wind Analytics Daily Tracker) | Prescreen, ZV Analysis, Accurance Analysis, Nordex Analysis, Nordex FQC, FQC, Quality Issues |
+| External Quality Issues | Engineering – needs review, Ops – action needed, Ready for analysis, Product-related issues |
+| Internal Blade Analytics | Prescreen + Analysis, FQC, Quality Issues |
+| Internal Data Process | Pending upload, Data available to download, In pre-processing, Pilot uploader |
+| Zero Down Time Analytics | Prescreen + Analysis, FQC, Quality Issues |
+| ZDT Data Process | ZDT pre-processing, ZDT pilot uploader |
+| ZV–Skyspecs GE Upload | Yet to upload, In progress, Issue / error |
+
+Rules: a tracker's total is the sum of its stages (each WTG sits in one stage). Unlike the sheet's
+Summary (2121 on 26 Nov), the External total **includes Nordex Analysis and Nordex FQC** — the
+sheet's Total column sits before the Nordex columns. Trackers are never added together. A day whose
+stages are all blank/zero was not updated and is skipped; counts carry forward until the next count.
+Tables: `pipeline_counts (tracker, stage, date)`, `priority_sites`. In-app mode: leads record the
+day's counts on **Inventory** (prefilled with the last count) and manage priority sites; START FRESH
+keeps both (they are a running state, not history from the other sheets).

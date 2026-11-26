@@ -281,3 +281,40 @@ export const auditEvents = pgTable(
   },
   (t) => [index("audit_entity_idx").on(t.entity, t.entityId)],
 );
+
+// ---------- Wind inventory pipeline (Wind-Inventory Count sheet, or entered in the app) ----------
+
+/** WTGs (or QIs / items) in each stage of each tracker, as counted on a day. */
+export const pipelineCounts = pgTable(
+  "pipeline_counts",
+  {
+    tracker: text("tracker").notNull(),
+    stage: text("stage").notNull(),
+    date: d("date").notNull(),
+    count: doublePrecision("count").notNull(),
+    updatedBy: text("updated_by"),
+    updatedAt: ts("updated_at"),
+    hash: text("hash").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tracker, t.stage, t.date] }), index("pipeline_date_idx").on(t.date)],
+);
+
+/** Customer sites the Ops coordinators asked to prioritise ("Priority" tab). */
+export const prioritySites = pgTable("priority_sites", {
+  id: text("id").primaryKey(),
+  site: text("site").notNull(),
+  wtgs: doublePrecision("wtgs"),
+  customer: text("customer").notNull().default(""),
+  prescreen: text("prescreen").notNull().default(""),
+  analysis: text("analysis").notNull().default(""),
+  fqc: text("fqc").notNull().default(""),
+  requestedBy: text("requested_by").notNull().default(""),
+  sla: text("sla").notNull().default(""),
+  status: text("status").notNull().default(""),
+  comments: text("comments").notNull().default(""),
+  etd: d("etd"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  updatedBy: text("updated_by"),
+  updatedAt: ts("updated_at"),
+  hash: text("hash").notNull(),
+});

@@ -18,6 +18,7 @@ import { leaveDaysRequested } from "@/lib/domain/calendar-engine";
 import { refreshAlerts } from "@/lib/domain/alerts";
 import { getProcessTargets, getSettings, saveProcessTargets as saveProcessTargets_ } from "@/lib/domain/settings";
 import { RANGE_RE, upperEnd } from "@/lib/targets";
+import { TRACKER } from "@/lib/pipeline";
 
 export interface Result {
   ok: boolean;
@@ -582,6 +583,110 @@ export async function switchToSheetsMode(confirmText: string): Promise<Result> {
     await done(["/data-sources", "/settings"]);
     if (r.status === "failed") return { ok: true, message: `Back on the Google Sheets, but the sync failed (${r.error ?? "unknown error"}). Run "Sync now" on Data Sources.` };
     return { ok: true, message: "Back on the Google Sheets. Data reloaded from the sheets." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ------------------------------------------------------------------ wind inventory pipeline (lead)
+
+const PipelineInput = z.object({
+  date: isoDate,
+  counts: z.record(z.string(), z.record(z.string(), z.coerce.number().min(0, "Counts cannot be negative").max(100000, "A count looks too large"))),
+});
+
+/** The day's count of WTGs in every stage of every tracker (replaces the Asana daily tally). */
+export async function savePipeline(input: z.input<typeof PipelineInput>): Promise<Result> {
+  try {
+    await requireAppMode();
+    const user = await requireRole("lead");
+    const v = PipelineInput.parse(input);
+    if (v.date > todayIST()) throw new Error("Counts can't be recorded for a future date.");
+    const now = nowIso();
+    const rows: (typeof schema.pipelineCounts.$inferInsert)[] = [];
+    for (const [tid, stages] of Object.entries(v.counts)) {
+      const t = TRACKER.get(tid);
+      if (!t) throw new Error(`Unknown tracker "${tid}"`);
+      for (const [sid, n] of Object.entries(stages)) {
+        if (!t.stages.some((s) => s.id === sid)) throw new Error(`Unknown stage "${sid}" in ${t.label}`);
+        rows.push({ tracker: tid, stage: sid, date: v.date, count: Math.round(n * 100) / 100, updatedBy: user.email, updatedAt: now, hash: "" });
+      }
+    }
+    if (!rows.length) throw new Error("Enter at least one count.");
+    const db = await getDb();
+    await db.transaction(async (tx) => {
+      for (const r of rows)
+        await tx
+          .insert(schema.pipelineCounts)
+          .values(r)
+          .onConflictDoUpdate({ target: [schema.pipelineCounts.tracker, schema.pipelineCounts.stage, schema.pipelineCounts.date], set: { count: r.count, updatedBy: r.updatedBy, updatedAt: r.updatedAt } });
+    });
+    await audit(user.email, "pipeline", v.date, "saved", v.counts);
+    await done(["/inventory", "/dashboard"]);
+    return { ok: true, message: `Pipeline counts for ${v.date} saved` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+const PriorityInput = z.object({
+  id: z.string().optional(),
+  site: z.string().trim().min(2, "Enter the site name").max(120),
+  wtgs: z.union([z.literal(""), z.coerce.number().min(0).max(10000)]).optional(),
+  customer: z.string().trim().max(80).default(""),
+  prescreen: z.string().trim().max(40).default(""),
+  analysis: z.string().trim().max(40).default(""),
+  fqc: z.string().trim().max(40).default(""),
+  requestedBy: z.string().trim().max(80).default(""),
+  sla: z.string().trim().max(40).default(""),
+  status: z.string().trim().max(40).default("Not started"),
+  comments: z.string().trim().max(500).default(""),
+  etd: isoDate.optional().or(z.literal("")),
+});
+
+export async function savePrioritySite(input: z.input<typeof PriorityInput>): Promise<Result> {
+  try {
+    await requireAppMode();
+    const user = await requireRole("lead");
+    const v = PriorityInput.parse(input);
+    const db = await getDb();
+    const id = v.id || `P-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const row = {
+      id,
+      site: v.site,
+      wtgs: v.wtgs === "" || v.wtgs === undefined ? null : Number(v.wtgs),
+      customer: v.customer,
+      prescreen: v.prescreen,
+      analysis: v.analysis,
+      fqc: v.fqc,
+      requestedBy: v.requestedBy,
+      sla: v.sla,
+      status: v.status,
+      comments: v.comments,
+      etd: v.etd || null,
+      updatedBy: user.email,
+      updatedAt: nowIso(),
+      hash: "",
+    };
+    const { id: _i, ...set } = row;
+    await db.insert(schema.prioritySites).values({ ...row, sortOrder: 0 }).onConflictDoUpdate({ target: schema.prioritySites.id, set });
+    await audit(user.email, "priority", id, v.id ? "updated" : "created", row);
+    await done(["/inventory", "/dashboard"]);
+    return { ok: true, message: `${v.site} saved` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deletePrioritySite(id: string): Promise<Result> {
+  try {
+    await requireAppMode();
+    const user = await requireRole("lead");
+    const db = await getDb();
+    await db.delete(schema.prioritySites).where(eq(schema.prioritySites.id, id));
+    await audit(user.email, "priority", id, "deleted");
+    await done(["/inventory", "/dashboard"]);
+    return { ok: true, message: "Site removed" };
   } catch (e) {
     return fail(e);
   }
