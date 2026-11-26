@@ -7,7 +7,7 @@ import { Badge, Card, CardBody, CardHeader, PageHeader, input } from "@/componen
 import { AddUser, RoleSelect, SettingsForm } from "@/components/admin-client";
 import { ALLOWED_DOMAIN } from "@/lib/config";
 import { getDataMode } from "@/lib/entry/store";
-import { GoLiveSwitch, HolidayManager, TargetEditor } from "@/components/entry/forms";
+import { BackToSheetsSwitch, GoLiveSwitch, HolidayManager, TargetEditor } from "@/components/entry/forms";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +61,11 @@ export default async function Settings() {
                 <Num name="minCoveragePct" label="Minimum target coverage" value={s.ranking.minCoveragePct} suffix="%" hint="Share of output in processes that have a target" />
                 <Num name="minPresentDays" label="Minimum present days" value={s.ranking.minPresentDays} suffix="days" />
                 <Num name="selfEditDays" label="People can edit their own output for" value={s.entry.selfEditDays} suffix="past days" hint="In-app data entry: older days need a lead" />
+                <label className="flex flex-col gap-1 text-[12.5px] text-ink-2 sm:col-span-2">
+                  Zoho People leave page
+                  <input name="zohoLeaveUrl" type="url" defaultValue={s.entry.zohoLeaveUrl} placeholder="https://people.zoho.in/…" className={input} />
+                  <span className="text-[11.5px] text-muted">Approved leave shows an &ldquo;Apply in Zoho&rdquo; button that opens this page. Open the leave application page in Zoho People and paste its address here. Leave empty to hide the button.</span>
+                </label>
               </div>
             </CardBody>
           </Card>
@@ -142,6 +147,15 @@ export default async function Settings() {
                   <li>A lead can mark a day by hand (e.g. LoP) on the Attendance page; that wins over everything else.</li>
                 </ul>
               </div>
+              {admin && (
+                <div className="rounded-xl border border-line p-4 xl:col-span-2">
+                  <h3 className="mb-1 text-[13px] font-semibold text-ink">Trial run? Switch back to the Google Sheets</h3>
+                  <p className="mb-3 text-[12.5px] text-ink-2">
+                    Reloads everything from the sheets (they were never changed). Anything entered in the app — output, leave, overtime, inventory, roster edits and manual attendance marks — is removed. Holidays, tasks, users and settings are kept. You can switch to in-app entry again later with START FRESH.
+                  </p>
+                  <BackToSheetsSwitch />
+                </div>
+              )}
             </div>
           )}
         </CardBody>

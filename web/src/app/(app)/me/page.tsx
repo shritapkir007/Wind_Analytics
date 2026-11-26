@@ -11,7 +11,8 @@ import { PROCESSES } from "@/lib/processes";
 import { teamLabel } from "@/lib/teams";
 import { fmtNum, type SP } from "@/lib/view";
 import { Badge, Card, CardBody, CardHeader, Empty, PageHeader, Table, td, th } from "@/components/ui";
-import { CancelLeave, LeaveForm, OutputForm, OvertimeForm } from "@/components/entry/forms";
+import { CancelLeave, LeaveForm, OutputForm, OvertimeForm, ZohoLeave } from "@/components/entry/forms";
+import { getSettings } from "@/lib/domain/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export default async function MyWorkspace({ searchParams }: { searchParams: Prom
   const processes = PROCESSES.map((p) => ({ column: p.column, label: p.label, family: p.family, target: ds.processes.get(p.column)?.target.perDay ?? null }));
   const targetOf = new Map(processes.map((p) => [p.column, p.target]));
   const own = me.employee?.key === person.key;
+  const { entry } = await getSettings();
   const calendar = [...eachDay(addDays(today, -6), addDays(today, 14))].map((d) => ({ date: d, rawCode: ds.calendar.get(`${person.key}|${d}`)?.rawCode ?? null }));
 
   return (
@@ -123,6 +125,7 @@ export default async function MyWorkspace({ searchParams }: { searchParams: Prom
                     <td className={td}>
                       <Badge tone={tone(l.approvalStatus)}>{l.approvalStatus || "—"}</Badge>
                       {l.leadComment && <span className="block text-[11.5px] text-ink-2">{l.leadComment}</span>}
+                      {l.approvalStatus === "Approved" && <span className="mt-1 block"><ZohoLeave id={l.workflowId} url={entry.zohoLeaveUrl} applied={l.zohoApplied === "Yes"} /></span>}
                     </td>
                     <td className={td}>{(l.approvalStatus === "Pending" || (l.approvalStatus === "Approved" && l.startDate && l.startDate > today)) && <CancelLeave id={l.workflowId} />}</td>
                   </tr>

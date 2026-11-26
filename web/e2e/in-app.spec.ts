@@ -68,6 +68,24 @@ test("request leave, then approve it", async ({ page }) => {
   await expect(page.locator("tr", { hasText: "CL" }).first()).toContainText("Approved");
 });
 
+test("approved leave links to Zoho and can be marked as applied", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByLabel("Zoho People leave page").fill("https://people.zoho.in/example#leavetracker/applyleave");
+  await page.getByRole("button", { name: /Save settings/i }).click();
+  await expect(page.getByText("Saved · alerts recalculated")).toBeVisible();
+  await page.goto("/approvals");
+  await expect(page.locator("tr", { hasText: "Dev Admin" }).first()).toContainText("CL");
+  await page.goto("/me");
+  const row = page.locator("tr", { hasText: "CL" }).first();
+  await expect(row.getByRole("link", { name: "Apply in Zoho" })).toHaveAttribute("href", "https://people.zoho.in/example#leavetracker/applyleave");
+  await expect(row.getByRole("link", { name: "Apply in Zoho" })).toHaveAttribute("target", "_blank");
+  await row.getByRole("button", { name: "Mark as applied" }).click();
+  await expect(row).toContainText("Applied in Zoho");
+  await expect(row.getByRole("link", { name: "Apply in Zoho" })).toHaveCount(0);
+  await page.goto("/approvals");
+  await expect(page.getByText("Approved, not yet applied in Zoho (0)")).toBeVisible();
+});
+
 test("log overtime, then approve it", async ({ page }) => {
   await page.goto("/me");
   await page.getByLabel("Date worked", { exact: true }).fill("2026-11-22");
@@ -110,4 +128,21 @@ test("phone layout has no horizontal scroll on entry pages", async ({ browser })
     const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(over, p).toBeLessThanOrEqual(0);
   }
+});
+
+test("switch back to the sheets removes test entries, then go live again", async ({ page }) => {
+  await page.goto("/settings#data-entry");
+  await page.getByLabel("Type BACK TO SHEETS to confirm").fill("BACK TO SHEETS");
+  await page.getByRole("button", { name: "Switch back to Google Sheets" }).click();
+  await expect(page.getByText("Currently reading the Google Sheets on every sync.")).toBeVisible({ timeout: 90_000 });
+  // the sheet data is back and the person added during the test is gone
+  await page.goto("/people?all=1");
+  await expect(page.locator("tr", { hasText: "dev.admin@zeitview.com" })).toHaveCount(0);
+  await page.goto("/output");
+  await expect(page.locator("body")).not.toContainText("No data");
+  // and START FRESH works again for the real launch
+  await page.goto("/settings#data-entry");
+  await page.getByLabel("Type START FRESH to confirm").fill("START FRESH");
+  await page.getByRole("button", { name: "Switch to in-app data entry" }).click();
+  await expect(page.getByText("Live: everything is entered in this app")).toBeVisible({ timeout: 60_000 });
 });

@@ -232,6 +232,25 @@ export async function cancelLeave(workflowId: string): Promise<Result> {
   }
 }
 
+/** The person (or their lead) confirms the approved leave was also applied in Zoho People (payroll). */
+export async function markZohoApplied(workflowId: string, applied: boolean): Promise<Result> {
+  try {
+    await requireAppMode();
+    const me = await whoAmI(await currentUser());
+    const db = await getDb();
+    const [l] = await db.select().from(schema.leaveRequests).where(eq(schema.leaveRequests.workflowId, workflowId));
+    if (!l) throw new Error("Request not found.");
+    if (!canActFor(me, await employee(l.employeeKey))) throw new Error("You can only update your own requests (leads: your team's).");
+    if (l.approvalStatus !== "Approved") throw new Error("Only approved requests are applied in Zoho.");
+    await db.update(schema.leaveRequests).set({ zohoApplied: applied ? "Yes" : "" }).where(eq(schema.leaveRequests.workflowId, workflowId));
+    await audit(me.user.email, "leave", workflowId, applied ? "zoho applied" : "zoho not applied");
+    await done(["/me", "/approvals"]);
+    return { ok: true, message: applied ? "Marked as applied in Zoho" : "Zoho mark removed" };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 // ------------------------------------------------------------------ overtime
 
 const OtInput = z.object({
@@ -546,6 +565,35 @@ export async function switchToAppMode(confirmText: string): Promise<Result> {
     await audit(user.email, "mode", "app", "switched", { startFresh: true });
     await done(["/data-sources", "/settings"]);
     return { ok: true, message: "In-app data entry is on. The sheet sync has stopped." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ------------------------------------------------------------------ switch back to the sheets (trial runs)
+
+/**
+ * Returns to reading the Google Sheets. A full sync then replaces output, attendance, leave, overtime,
+ * inventory, roster and targets with the sheet data, so anything entered in the app while testing is
+ * removed. Manual attendance marks are cleared (they have no place in the sheets). Holidays, tasks,
+ * users, settings and the activity log are kept.
+ */
+export async function switchToSheetsMode(confirmText: string): Promise<Result> {
+  try {
+    const user = await requireRole("admin");
+    if (confirmText.trim().toUpperCase() !== "BACK TO SHEETS") throw new Error("Type BACK TO SHEETS to confirm.");
+    if ((await getDataMode()) !== "app") throw new Error("The app is already reading the Google Sheets.");
+    const db = await getDb();
+    await db.transaction(async (tx) => {
+      await tx.delete(schema.attendanceOverrides);
+      await setDataMode("sheets", user.email, tx as never);
+    });
+    await audit(user.email, "mode", "sheets", "switched", { reason: "back to sheets" });
+    const { runSync } = await import("@/lib/sync/run");
+    const r = await runSync({ mode: "full", trigger: "manual", triggeredBy: user.email });
+    await done(["/data-sources", "/settings"]);
+    if (r.status === "failed") return { ok: true, message: `Back on the Google Sheets, but the sync failed (${r.error ?? "unknown error"}). Run "Sync now" on Data Sources.` };
+    return { ok: true, message: "Back on the Google Sheets. Data reloaded from the sheets." };
   } catch (e) {
     return fail(e);
   }

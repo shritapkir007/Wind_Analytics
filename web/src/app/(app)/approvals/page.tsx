@@ -1,7 +1,8 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte, ne } from "drizzle-orm";
 import { currentUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
-import { fmtDate } from "@/lib/domain/dates";
+import { addDays, fmtDate } from "@/lib/domain/dates";
+import { todayIST } from "@/lib/config";
 import { leaveDaysRequested } from "@/lib/domain/calendar-engine";
 import { canApproveFor, whoAmI } from "@/lib/entry/store";
 import { requireAppModePage } from "@/lib/entry/page-guard";
@@ -22,8 +23,16 @@ export default async function Approvals() {
     db.select().from(schema.overtimeEntries).where(eq(schema.overtimeEntries.status, "Pending")).orderBy(asc(schema.overtimeEntries.date)),
     db.select().from(schema.holidays),
   ]);
-  const holidays = new Map(hol.map((h) => [h.date, h.name]));
   const emp = new Map(emps.map((e) => [e.key, e]));
+  // Approved in the app but not yet applied in Zoho People (payroll), last 90 days onwards.
+  const notInZoho = (
+    await db
+      .select()
+      .from(schema.leaveRequests)
+      .where(and(eq(schema.leaveRequests.approvalStatus, "Approved"), ne(schema.leaveRequests.zohoApplied, "Yes"), gte(schema.leaveRequests.endDate, addDays(todayIST(), -90))))
+      .orderBy(asc(schema.leaveRequests.startDate))
+  ).filter((l) => canApproveFor(me, emp.get(l.employeeKey)) || me.employee?.key === l.employeeKey);
+  const holidays = new Map(hol.map((h) => [h.date, h.name]));
   const myLeaves = leaves.filter((l) => canApproveFor(me, emp.get(l.employeeKey)));
   const myOt = ot.filter((o) => o.employeeKey && canApproveFor(me, emp.get(o.employeeKey)));
 
@@ -86,6 +95,31 @@ export default async function Approvals() {
                     <td className={`${td} tnum whitespace-nowrap`}>{o.timeStart}–{o.timeEnd} · {o.shift}</td>
                     <td className={td}>{o.turbinesText || "—"}</td>
                     <td className={td}><Decision kind="overtime" id={o.rowKey} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+        <Card>
+          <CardHeader title={`Approved, not yet applied in Zoho (${notInZoho.length})`} subtitle="Approved here but not marked as applied in Zoho People, so payroll may not have it yet. People mark this themselves after applying." />
+          {notInZoho.length === 0 ? (
+            <div className="p-4"><Empty title="All applied">Every approved request in your scope is marked as applied in Zoho.</Empty></div>
+          ) : (
+            <Table>
+              <thead>
+                <tr>{["Person", "Request", "Dates", "Approved by"].map((h) => <th key={h} className={th}>{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {notInZoho.map((l) => (
+                  <tr key={l.workflowId}>
+                    <td className={`${td} font-medium`}>{emp.get(l.employeeKey)?.name ?? l.employeeKey}</td>
+                    <td className={td}>{l.leaveType}</td>
+                    <td className={`${td} whitespace-nowrap`}>
+                      {l.startDate ? fmtDate(l.startDate, true) : "—"}
+                      {l.endDate && l.endDate !== l.startDate ? ` – ${fmtDate(l.endDate, true)}` : ""}
+                    </td>
+                    <td className={`${td} text-ink-2`}>{l.reviewedBy || "—"}</td>
                   </tr>
                 ))}
               </tbody>

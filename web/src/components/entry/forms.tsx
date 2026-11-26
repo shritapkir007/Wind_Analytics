@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Check, ExternalLink, Loader2, Plus, Trash2, X } from "lucide-react";
 import * as A from "@/app/(app)/entry-actions";
 import { LEAVE_REQUEST_TYPES, OVERRIDE_CODES, STREAMS, WEEKDAYS } from "@/lib/entry/catalog";
 import { btn, input } from "@/components/ui";
@@ -741,5 +741,59 @@ export function GoLiveSwitch() {
       </button>
       <Status res={res} />
     </form>
+  );
+}
+
+export function BackToSheetsSwitch() {
+  const { pending, res, run } = useAction();
+  const [text, setText] = useState("");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(() => A.switchToSheetsMode(text));
+      }}
+      className="flex flex-wrap items-end gap-2"
+    >
+      <div>
+        <label className={label} htmlFor="back-sheets">Type BACK TO SHEETS to confirm</label>
+        <input id="back-sheets" value={text} onChange={(e) => setText(e.target.value)} className={`${input} w-56`} autoComplete="off" />
+      </div>
+      <button type="submit" className={btn.secondary} disabled={pending || text.trim().toUpperCase() !== "BACK TO SHEETS"}>
+        {pending && <Loader2 size={14} className="animate-spin" aria-hidden />} Switch back to Google Sheets
+      </button>
+      <Status res={res} />
+    </form>
+  );
+}
+
+// ------------------------------------------------------------------ Zoho People (payroll)
+
+/** On an approved request: open Zoho People to apply the same leave, then confirm it was applied. */
+export function ZohoLeave({ id, url, applied }: { id: string; url: string; applied: boolean }) {
+  const { pending, res, run } = useAction();
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      {url && !applied && (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md bg-accent px-2.5 text-[12.5px] font-medium text-accent-ink hover:opacity-90">
+          Apply in Zoho <ExternalLink size={13} aria-hidden />
+        </a>
+      )}
+      {applied ? (
+        <>
+          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-good">
+            <Check size={13} aria-hidden /> Applied in Zoho
+          </span>
+          <button type="button" className="text-[11.5px] text-muted underline hover:text-ink" disabled={pending} onClick={() => run(() => A.markZohoApplied(id, false))}>
+            Undo
+          </button>
+        </>
+      ) : (
+        <button type="button" className={btn.ghost} disabled={pending} onClick={() => run(() => A.markZohoApplied(id, true))}>
+          {pending ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Check size={13} aria-hidden />} Mark as applied
+        </button>
+      )}
+      {res && !res.ok && <span className="text-[11.5px] text-critical">{res.error}</span>}
+    </span>
   );
 }
