@@ -27,7 +27,9 @@ async function connect(): Promise<DB> {
     const local = ["localhost", "127.0.0.1", "::1"].includes(host);
     const client = postgres(url, {
       prepare: false,
-      max: Number(process.env.DB_POOL_MAX ?? 5),
+      // Serverless: every running instance holds its own pool, and Supabase's session pooler only
+      // allows a few connections in total, so keep each instance small (override: DB_POOL_MAX).
+      max: Number(process.env.DB_POOL_MAX ?? (process.env.VERCEL ? 2 : 5)),
       // One query per connection at a time. postgres.js otherwise pipelines up to 100 queries
       // on a busy connection, which Supabase's transaction pooler (Supavisor) can stall on.
       ...({ max_pipeline: 1 } as Record<string, number>), // supported at runtime, missing from the type definitions
