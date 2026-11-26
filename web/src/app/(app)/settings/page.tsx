@@ -1,13 +1,14 @@
 import { desc } from "drizzle-orm";
 import { can, currentUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
-import { ALERT_KINDS, getSettings } from "@/lib/domain/settings";
+import { ALERT_KINDS, getProcessTargets, getSettings } from "@/lib/domain/settings";
 import { getDataset } from "@/lib/domain/dataset";
 import { Badge, Card, CardBody, CardHeader, PageHeader, input } from "@/components/ui";
 import { AddUser, RoleSelect, SettingsForm } from "@/components/admin-client";
 import { ALLOWED_DOMAIN } from "@/lib/config";
 import { getDataMode } from "@/lib/entry/store";
-import { BackToSheetsSwitch, GoLiveSwitch, HolidayManager, TargetEditor } from "@/components/entry/forms";
+import { BackToSheetsSwitch, GoLiveSwitch, HolidayManager, ProcessTargetsForm } from "@/components/entry/forms";
+import { PROCESSES } from "@/lib/processes";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function Settings() {
   const users = await db.select().from(schema.users).orderBy(desc(schema.users.lastLogin));
   const fieldset = admin ? "" : "pointer-events-none opacity-70";
   const mode = await getDataMode();
-  const [holidays, targetRows] = await Promise.all([db.select().from(schema.holidays).orderBy(schema.holidays.date), db.select().from(schema.targets).orderBy(schema.targets.method, schema.targets.process)]);
+  const [holidays, pt] = await Promise.all([db.select().from(schema.holidays).orderBy(schema.holidays.date), getProcessTargets()]);
 
   return (
     <div className="fade-in">
@@ -124,7 +125,7 @@ export default async function Settings() {
                   Switching on in-app entry makes this app the only source: people log their own output, leave and overtime under <strong className="text-ink">My workspace</strong>, leads approve under <strong className="text-ink">Approvals</strong> and record <strong className="text-ink">Inventory</strong>, and managers keep the roster in <strong className="text-ink">People &amp; Teams</strong>.
                 </p>
                 <p>
-                  <strong className="text-critical">Start fresh:</strong> the roster, teams and targets are kept (and become editable here); all output, attendance, leave, overtime and inventory history imported from the sheets is deleted. The sheet sync stops. This can&apos;t be undone from the app.
+                  <strong className="text-critical">Start fresh:</strong> the roster, teams and targets are kept; all output, attendance, leave, overtime and inventory history imported from the sheets is removed from the app (the sheets themselves are never changed). The sheet sync stops. For a trial run you can come back with &ldquo;Switch back to Google Sheets&rdquo;, which reloads everything from the sheets.
                 </p>
                 <GoLiveSwitch />
               </div>
@@ -162,38 +163,19 @@ export default async function Settings() {
       </Card>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
-        {mode === "app" && admin ? (
-          <Card className="xl:col-span-2">
-            <CardHeader title="Productivity targets" subtitle="Targets per day used for productivity. Process columns are matched to a target by method + process." />
-            <CardBody>
-              <TargetEditor targets={targetRows.map((t) => ({ key: t.key, method: t.method, process: t.process, range: t.range, perDay: t.perDay, minutesPerWtg: t.minutesPerWtg }))} />
-            </CardBody>
-          </Card>
-        ) : null}
         <Card>
-          <CardHeader title="Productivity targets" subtitle={mode === "app" ? "How each process column resolves to a target" : "Read from the Target tab on every sync — edit them in the sheet, not here"} />
+          <CardHeader
+            title="Productivity targets"
+            subtitle={admin ? "Kept in the app. Enter a number or a range; the upper end counts as 100% of target." : "Kept in the app; the upper end of each range counts as 100% of target. Only admins can change them."}
+          />
           <CardBody>
-            <table className="w-full text-[13px]">
-              <thead className="text-left text-[12px] text-ink-2">
-                <tr>
-                  <th className="pb-2 font-medium">Process column</th>
-                  <th className="pb-2 font-medium">Target row</th>
-                  <th className="pb-2 text-right font-medium">WTG/day</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...ds.processes.values()]
-                  .filter((p) => p.inProductivity)
-                  .map((p) => (
-                    <tr key={p.column} className="border-t border-line">
-                      <td className="py-2 text-ink">{p.label}</td>
-                      <td className="py-2 text-ink-2">{p.target.source}</td>
-                      <td className="tnum py-2 text-right">{p.target.perDay ?? <Badge tone="warning">missing</Badge>}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-            <p className="mt-3 text-[12px] text-muted">Excluded from productivity (counted as output only): {[...ds.processes.values()].filter((p) => !p.inProductivity).map((p) => p.label).join(", ")}.</p>
+            <ProcessTargetsForm
+              editable={admin}
+              rows={PROCESSES.filter((p) => p.inProductivity).map((p) => ({ column: p.column, label: p.label, family: p.family, range: pt.targets[p.column] ?? "" }))}
+            />
+            <p className="mt-3 text-[12px] text-muted">
+              {pt.updatedBy ? `Last changed by ${pt.updatedBy} on ${pt.updatedAt?.slice(0, 10)}.` : "Targets agreed on 26 Nov 2026."} Excluded from productivity (counted as output only): {[...ds.processes.values()].filter((p) => !p.inProductivity).map((p) => p.label).join(", ")}.
+            </p>
           </CardBody>
         </Card>
         <Card>

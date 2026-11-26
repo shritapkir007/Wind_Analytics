@@ -1,6 +1,7 @@
 // KPI calculations. Pure functions over an in-memory Dataset; see docs/ARCHITECTURE.md §6.
 
 import type { CalendarDay, DeliveryDay, Employee, LeaveRequest, OutputSubmission, OvertimeEntry, Stream, TargetRow } from "../types";
+import { upperEnd } from "../targets";
 import { PROCESSES, processFor, resolveTarget, type Family, type ProcessDef, type ResolvedTarget } from "../processes";
 import { addDays, eachDay, monthStart, previousPeriod, weekStart } from "./dates";
 import { inTeamScope } from "../teams";
@@ -48,6 +49,14 @@ export interface Dataset {
   tasks: Task[];
 }
 
+function appTarget(def: ProcessDef, targets: Record<string, string>): ResolvedTarget {
+  if (!def.inProductivity) return { perDay: null, range: "", targetKey: null, source: "no target (excluded)" };
+  const range = targets[def.column] ?? "";
+  const perDay = upperEnd(range);
+  if (perDay == null) return { perDay: null, range: "", targetKey: null, source: "no target set" };
+  return { perDay, range: range.trim(), targetKey: null, source: `Set in app · range ${range.trim()} (upper end)` };
+}
+
 export function buildDataset(input: {
   today: string;
   employees: Employee[];
@@ -59,13 +68,15 @@ export function buildDataset(input: {
   overtime: OvertimeEntry[];
   references: { key: string; value: number }[];
   tasks: Task[];
+  /** Targets kept in the app (column → range, upper end = per day). When given, the Target tab is not used. */
+  appTargets?: Record<string, string>;
 }): Dataset {
   const cols = new Set<string>(PROCESSES.map((p) => p.column));
   for (const s of input.submissions) for (const c of Object.keys(s.entries)) cols.add(c);
   const processes = new Map<string, ProcessInfo>();
   for (const c of cols) {
     const def = processFor(c);
-    const target = resolveTarget(def, input.targets);
+    const target = input.appTargets ? appTarget(def, input.appTargets) : resolveTarget(def, input.targets);
     processes.set(c, { ...def, lookup: def.target, target, counts: def.inProductivity && target.perDay != null });
   }
   const calendar = new Map(input.calendar.map((d) => [`${d.employeeKey}|${d.date}`, d]));

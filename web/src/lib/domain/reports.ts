@@ -228,7 +228,7 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
   const noOut = perf.filter((p) => p.noOutputDays >= 2);
   if (noOut.length) rep.insights.push(`${noOut.length} ${noOut.length === 1 ? "person has" : "people have"} 2+ present days without a User Input entry — output may be under-reported: ${noOut.slice(0, 5).map((p) => `${p.employee.name} (${p.noOutputDays})`).join(", ")}.`);
   const missingTarget = [...ds.processes.values()].filter((p) => p.inProductivity && !p.counts && (out.byProcess[p.column] ?? 0) > 0);
-  if (missingTarget.length) rep.insights.push(`${missingTarget.map((p) => p.label).join(", ")} ${missingTarget.length === 1 ? "is" : "are"} meant to count toward productivity but ${missingTarget.length === 1 ? "has" : "have"} no row in the Target tab, so ${missingTarget.length === 1 ? "it is" : "they are"} excluded until a target is added.`);
+  if (missingTarget.length) rep.insights.push(`${missingTarget.map((p) => p.label).join(", ")} ${missingTarget.length === 1 ? "is" : "are"} meant to count toward productivity but ${missingTarget.length === 1 ? "has" : "have"} no target in Settings, so ${missingTarget.length === 1 ? "it is" : "they are"} excluded until a target is added.`);
   for (const d of del) {
     const rate = d.deliveryRatePct;
     if (rate != null && rate < 50) rep.insights.push(`${d.stream}: only ${pct(rate)} delivery rate — pending inventory (${r2(d.inventory)}) exceeds what was delivered (${r2(d.delivered)}).`);

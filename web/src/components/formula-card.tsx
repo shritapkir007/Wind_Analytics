@@ -13,7 +13,7 @@ export function FormulaCard() {
           </div>
           <div>
             <dt className="font-medium text-ink">Target-days earned</dt>
-            <dd>For each User Input quantity in a targeted process: quantity ÷ that process&apos;s Average WTG/Day in the Target tab (e.g. 11 Ext FQC = 1 target-day).</dd>
+            <dd>For each User Input quantity in a targeted process: quantity ÷ that process&apos;s target per day (Settings → Productivity targets; the upper end of the range, e.g. 12 Ext FQC = 1 target-day for 10-12).</dd>
           </div>
           <div>
             <dt className="font-medium text-ink">Productivity %</dt>

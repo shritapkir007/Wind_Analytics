@@ -10,13 +10,14 @@ import { currentUser, requireRole } from "@/auth";
 import { getDb, schema } from "@/lib/db";
 import { ALLOWED_DOMAIN, nowIso, todayIST } from "@/lib/config";
 import { addDays } from "@/lib/domain/dates";
-import { PROCESSES, targetKey } from "@/lib/processes";
+import { PROCESSES } from "@/lib/processes";
 import { normEmail } from "@/lib/sheets/normalize";
 import { LEAVE_REQUEST_TYPES, OVERRIDE_CODES, STREAMS, requestKindLabel } from "@/lib/entry/catalog";
 import { audit, bumpDataVersion, canActFor, canApproveFor, getDataMode, rebuildCalendar, setDataMode, whoAmI } from "@/lib/entry/store";
 import { leaveDaysRequested } from "@/lib/domain/calendar-engine";
 import { refreshAlerts } from "@/lib/domain/alerts";
-import { getSettings } from "@/lib/domain/settings";
+import { getProcessTargets, getSettings, saveProcessTargets as saveProcessTargets_ } from "@/lib/domain/settings";
+import { RANGE_RE, upperEnd } from "@/lib/targets";
 
 export interface Result {
   ok: boolean;
@@ -499,41 +500,28 @@ export async function deleteHoliday(date: string): Promise<Result> {
   }
 }
 
-const TargetInput = z.object({
-  method: z.string().trim().min(1).max(60),
-  process: z.string().trim().min(1).max(80),
-  perDay: z.coerce.number().positive("Target must be above 0").max(1000),
-  range: z.string().trim().max(30).default(""),
-  minutesPerWtg: z.union([z.coerce.number().positive().max(2000), z.literal("")]).optional(),
-});
-
-export async function saveTarget(input: z.input<typeof TargetInput>): Promise<Result> {
+// Productivity targets kept in the app (column → range; the upper end is the per-day target).
+export async function saveProcessTargets(input: Record<string, string>): Promise<Result> {
   try {
-    await requireAppMode();
     const user = await requireRole("admin");
-    const v = TargetInput.parse(input);
-    const key = targetKey(v.method, v.process);
-    const row = { key, method: v.method, process: v.process, images: "", range: v.range, perDay: v.perDay, minutesPerWtg: v.minutesPerWtg === "" || v.minutesPerWtg === undefined ? null : Number(v.minutesPerWtg), hash: "" };
-    const db = await getDb();
-    const { key: _k, ...set } = row;
-    await db.insert(schema.targets).values(row).onConflictDoUpdate({ target: schema.targets.key, set });
-    await audit(user.email, "target", key, "saved", row);
-    await done(["/settings", "/output"]);
-    return { ok: true, message: `Target ${v.method} · ${v.process} saved` };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
-export async function deleteTarget(key: string): Promise<Result> {
-  try {
-    await requireAppMode();
-    const user = await requireRole("admin");
-    const db = await getDb();
-    await db.delete(schema.targets).where(eq(schema.targets.key, key));
-    await audit(user.email, "target", key, "deleted");
-    await done(["/settings", "/output"]);
-    return { ok: true, message: "Target removed" };
+    const known = new Map(PROCESSES.filter((p) => p.inProductivity).map((p) => [p.column, p.label]));
+    const next: Record<string, string> = {};
+    for (const [col, raw] of Object.entries(input)) {
+      const label = known.get(col);
+      if (!label) throw new Error(`Unknown process "${col}"`);
+      const range = raw.trim().replace(/\s*-\s*/, "-");
+      if (!range) continue;
+      if (!RANGE_RE.test(range) || upperEnd(range) == null) throw new Error(`${label}: use a number or a range like 10-12`);
+      const [lo, hi] = range.split("-").map(Number);
+      if (hi !== undefined && hi < lo) throw new Error(`${label}: the range should go from low to high`);
+      if (upperEnd(range)! > 1000) throw new Error(`${label}: that target looks too large`);
+      next[col] = range;
+    }
+    const before = (await getProcessTargets()).targets;
+    await saveProcessTargets_(next, user.email);
+    await audit(user.email, "target", "productivity", "saved", { before, after: next });
+    await done(["/settings", "/output", "/employees"]);
+    return { ok: true, message: "Targets saved · productivity recalculated" };
   } catch (e) {
     return fail(e);
   }
