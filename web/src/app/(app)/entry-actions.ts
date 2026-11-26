@@ -232,6 +232,25 @@ export async function cancelLeave(workflowId: string): Promise<Result> {
   }
 }
 
+/** The person (or their lead) confirms the approved leave was also applied in Zoho People (payroll). */
+export async function markZohoApplied(workflowId: string, applied: boolean): Promise<Result> {
+  try {
+    await requireAppMode();
+    const me = await whoAmI(await currentUser());
+    const db = await getDb();
+    const [l] = await db.select().from(schema.leaveRequests).where(eq(schema.leaveRequests.workflowId, workflowId));
+    if (!l) throw new Error("Request not found.");
+    if (!canActFor(me, await employee(l.employeeKey))) throw new Error("You can only update your own requests (leads: your team's).");
+    if (l.approvalStatus !== "Approved") throw new Error("Only approved requests are applied in Zoho.");
+    await db.update(schema.leaveRequests).set({ zohoApplied: applied ? "Yes" : "" }).where(eq(schema.leaveRequests.workflowId, workflowId));
+    await audit(me.user.email, "leave", workflowId, applied ? "zoho applied" : "zoho not applied");
+    await done(["/me", "/approvals"]);
+    return { ok: true, message: applied ? "Marked as applied in Zoho" : "Zoho mark removed" };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 // ------------------------------------------------------------------ overtime
 
 const OtInput = z.object({

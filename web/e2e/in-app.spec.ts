@@ -68,6 +68,24 @@ test("request leave, then approve it", async ({ page }) => {
   await expect(page.locator("tr", { hasText: "CL" }).first()).toContainText("Approved");
 });
 
+test("approved leave links to Zoho and can be marked as applied", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByLabel("Zoho People leave page").fill("https://people.zoho.in/example#leavetracker/applyleave");
+  await page.getByRole("button", { name: /Save settings/i }).click();
+  await expect(page.getByText("Saved · alerts recalculated")).toBeVisible();
+  await page.goto("/approvals");
+  await expect(page.locator("tr", { hasText: "Dev Admin" }).first()).toContainText("CL");
+  await page.goto("/me");
+  const row = page.locator("tr", { hasText: "CL" }).first();
+  await expect(row.getByRole("link", { name: "Apply in Zoho" })).toHaveAttribute("href", "https://people.zoho.in/example#leavetracker/applyleave");
+  await expect(row.getByRole("link", { name: "Apply in Zoho" })).toHaveAttribute("target", "_blank");
+  await row.getByRole("button", { name: "Mark as applied" }).click();
+  await expect(row).toContainText("Applied in Zoho");
+  await expect(row.getByRole("link", { name: "Apply in Zoho" })).toHaveCount(0);
+  await page.goto("/approvals");
+  await expect(page.getByText("Approved, not yet applied in Zoho (0)")).toBeVisible();
+});
+
 test("log overtime, then approve it", async ({ page }) => {
   await page.goto("/me");
   await page.getByLabel("Date worked", { exact: true }).fill("2026-11-22");

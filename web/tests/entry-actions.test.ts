@@ -122,6 +122,23 @@ describe("leave requests", () => {
     expect(ds.leave.find((l) => l.workflowId === id)).toMatchObject({ approvalStatus: "Approved", effective: true, reviewedBy: "lead.wind@zeitview.com" });
   });
 
+  it("marks approved leave as applied in Zoho (own or team only, approved only)", async () => {
+    as("asha@zeitview.com", "viewer");
+    const r = await A.requestLeave({ employeeKey: "asha@zeitview.com", type: "CL", startDate: "2026-12-07", endDate: "2026-12-07", reason: "Errand" });
+    const id = r.message!.match(/LR-\w+/)![0];
+    expect((await A.markZohoApplied(id, true)).error).toMatch(/Only approved/);
+    as("lead.wind@zeitview.com", "lead");
+    await A.decideLeave(id, "Approved");
+    as("enc@zeitview.com", "viewer");
+    expect((await A.markZohoApplied(id, true)).error).toMatch(/your own/);
+    as("asha@zeitview.com", "viewer");
+    expect(await A.markZohoApplied(id, true)).toMatchObject({ ok: true });
+    const db = await getDb();
+    const [l] = await db.select().from(schema.leaveRequests).where(eq(schema.leaveRequests.workflowId, id));
+    expect(l.zohoApplied).toBe("Yes");
+    expect(await A.markZohoApplied(id, false)).toMatchObject({ ok: true });
+  });
+
   it("supports half days and cancelling, and refuses requests that need no leave", async () => {
     as("asha@zeitview.com", "viewer");
     const r = await A.requestLeave({ employeeKey: "asha@zeitview.com", type: "CL", startDate: "2026-12-02", endDate: "2026-12-02", halfDay: "first", unplanned: true, reason: "Doctor" });

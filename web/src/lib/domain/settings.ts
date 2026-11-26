@@ -16,8 +16,11 @@ export interface AppSettings {
   thresholds: AlertThresholds;
   enabledAlerts: Record<string, boolean>;
   ranking: { minCoveragePct: number; minPresentDays: number };
-  /** In-app entry: how many past days people may still edit their own output. */
-  entry: { selfEditDays: number };
+  /**
+   * In-app entry: how many past days people may still edit their own output, and the Zoho People
+   * page where approved leave is applied for payroll (empty = no Zoho button).
+   */
+  entry: { selfEditDays: number; zohoLeaveUrl: string };
   notifications: { email: { enabled: boolean; recipients: string[] }; slack: { enabled: boolean; webhookConfigured: boolean }; teams: { enabled: boolean; webhookConfigured: boolean } };
 }
 
@@ -38,7 +41,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   thresholds: { lowDailyProductivityPct: 60, weeklyTargetPct: 80, inventoryRisePct: 15, inventoryRiseDays: 5, qualityIssuesMax: 150, noOutputGraceDays: 1 },
   enabledAlerts: Object.fromEntries(Object.keys(ALERT_KINDS).map((k) => [k, true])),
   ranking: { minCoveragePct: 70, minPresentDays: 5 },
-  entry: { selfEditDays: 7 },
+  entry: { selfEditDays: 7, zohoLeaveUrl: "" },
   notifications: {
     email: { enabled: false, recipients: [] },
     slack: { enabled: false, webhookConfigured: Boolean(process.env.SLACK_WEBHOOK_URL) },

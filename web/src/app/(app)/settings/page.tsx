@@ -61,6 +61,11 @@ export default async function Settings() {
                 <Num name="minCoveragePct" label="Minimum target coverage" value={s.ranking.minCoveragePct} suffix="%" hint="Share of output in processes that have a target" />
                 <Num name="minPresentDays" label="Minimum present days" value={s.ranking.minPresentDays} suffix="days" />
                 <Num name="selfEditDays" label="People can edit their own output for" value={s.entry.selfEditDays} suffix="past days" hint="In-app data entry: older days need a lead" />
+                <label className="flex flex-col gap-1 text-[12.5px] text-ink-2 sm:col-span-2">
+                  Zoho People leave page
+                  <input name="zohoLeaveUrl" type="url" defaultValue={s.entry.zohoLeaveUrl} placeholder="https://people.zoho.in/…" className={input} />
+                  <span className="text-[11.5px] text-muted">Approved leave shows an &ldquo;Apply in Zoho&rdquo; button that opens this page. Open the leave application page in Zoho People and paste its address here. Leave empty to hide the button.</span>
+                </label>
               </div>
             </CardBody>
           </Card>
