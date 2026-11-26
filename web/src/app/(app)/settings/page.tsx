@@ -11,6 +11,8 @@ import { BackToSheetsSwitch, GoLiveSwitch, HolidayManager, ProcessTargetsForm } 
 import { PROCESSES } from "@/lib/processes";
 
 export const dynamic = "force-dynamic";
+// Server actions on this page can run a full sheet sync (Sync now, Switch back to Google Sheets).
+export const maxDuration = 300;
 
 function Num({ name, label, value, hint, suffix }: { name: string; label: string; value: number; hint?: string; suffix?: string }) {
   return (

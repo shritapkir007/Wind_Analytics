@@ -10,6 +10,8 @@ import { SyncButtons } from "@/components/admin-client";
 import { getDataset } from "@/lib/domain/dataset";
 
 export const dynamic = "force-dynamic";
+// Server actions on this page can run a full sheet sync (Sync now, Switch back to Google Sheets).
+export const maxDuration = 300;
 
 const TABLE_SOURCE: Record<string, string> = {
   employees: "Calendar View (+ Employee ID)",
