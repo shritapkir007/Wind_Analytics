@@ -12,7 +12,7 @@ async function noErrors(page: Page, path: string) {
   expect(errors, `console errors on ${path}`).toEqual([]);
 }
 
-const PAGES = ["/overview", "/attendance", "/output", "/tasks", "/employees", "/reports", "/alerts", "/data-sources", "/settings", "/search?q=a"];
+const PAGES = ["/dashboard", "/overview", "/attendance", "/output", "/tasks", "/employees", "/reports", "/alerts", "/data-sources", "/settings", "/search?q=a"];
 
 test.describe("pages render without errors", () => {
   for (const p of PAGES) test(p, async ({ page }) => noErrors(page, p));
@@ -20,7 +20,7 @@ test.describe("pages render without errors", () => {
 
 test("phone layout has no horizontal page scroll", async ({ browser }) => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  for (const p of ["/overview", "/attendance", "/output", "/employees", "/tasks"]) {
+  for (const p of ["/dashboard", "/overview", "/attendance", "/output", "/employees", "/tasks"]) {
     await page.goto(p);
     await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -92,4 +92,13 @@ test("sync endpoint rejects anonymous scheduler calls without the secret", async
   // In dev-bypass mode the session counts as admin, so only check the secret path shape.
   const r = await request.post(`/api/sync?mode=quick`, { headers: { authorization: "Bearer wrong" } });
   expect([200, 401]).toContain(r.status());
+});
+
+test("home opens the one-page dashboard with the inventory pipeline", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page.getByRole("heading", { name: "External Blade Analytics" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ZV–Skyspecs GE Upload" })).toBeVisible();
+  await expect(page.getByText("Crookwell 2")).toBeVisible(); // open priority site from the sheet
+  await expect(page.getByText("Foard City")).toHaveCount(0); // completed sites are not shown
 });

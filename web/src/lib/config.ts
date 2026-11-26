@@ -17,12 +17,31 @@ export const WORKBOOKS = {
     env: "SHEET_OVERTIME_ID",
     tabs: ["Wind OT tracker 2026", "Employee ID"],
   },
+  inventory: {
+    label: "Wind-Inventory Count – 2026",
+    env: "SHEET_INVENTORY_ID",
+    tabs: [
+      "Asana - Wind Analytics Daily Tracker",
+      "Asana - External Quality Issues",
+      "Asana - Internal Blade Analytics Daily Tracker",
+      "Asana - Internal Data Process Tracker",
+      "Asana - ZDT Analytics Daily Tracker",
+      "ZDT Data Process",
+      "ZV-Skyspecs- GE Upload Tracker",
+      "Priority",
+    ],
+  },
 } as const;
+
+/** Workbooks with a known ID (used when the env variable is not set). */
+const DEFAULT_IDS: Partial<Record<keyof typeof WORKBOOKS, string>> = {
+  inventory: "1Xad0Er1b7qIX_hmR-nqfPJHfYdiBnyN5SuGLRjHnQ88",
+};
 
 export type WorkbookId = keyof typeof WORKBOOKS;
 
 export function sheetId(wb: WorkbookId): string | null {
-  return process.env[WORKBOOKS[wb].env]?.trim() || null;
+  return process.env[WORKBOOKS[wb].env]?.trim() || DEFAULT_IDS[wb] || null;
 }
 
 export function sheetUrl(wb: WorkbookId): string | null {

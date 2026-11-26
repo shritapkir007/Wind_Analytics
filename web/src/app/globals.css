@@ -212,3 +212,56 @@ body {
     padding: 0 !important;
   }
 }
+
+/* ---------- Wind theme: dashboard hero, turbines, wind streaks ---------- */
+:root {
+  --hero-from: #0c2a4d;
+  --hero-via: #15508f;
+  --hero-to: #1f8a9e;
+}
+:root[data-theme="dark"] {
+  --hero-from: #08182c;
+  --hero-via: #0f3560;
+  --hero-to: #125a68;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hero-from: #08182c;
+    --hero-via: #0f3560;
+    --hero-to: #125a68;
+  }
+}
+.wind-hero {
+  background:
+    radial-gradient(1200px 300px at 85% -20%, rgba(255, 255, 255, 0.16), transparent 60%),
+    linear-gradient(120deg, var(--hero-from), var(--hero-via) 55%, var(--hero-to));
+}
+.wind-rotor {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wind-rotor {
+    animation: wind-spin linear infinite;
+  }
+  .wind-streak {
+    stroke-dasharray: 60 400;
+    animation: wind-blow 6s linear infinite;
+  }
+}
+@keyframes wind-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes wind-blow {
+  from {
+    stroke-dashoffset: 460;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.spark-hit:hover {
+  fill: color-mix(in srgb, var(--ink) 6%, transparent);
+}

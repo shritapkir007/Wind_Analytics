@@ -109,6 +109,24 @@ test("record inventory", async ({ page }) => {
   await expect(page.getByLabel("External Delivered (leave empty = from FQC output)")).toHaveAttribute("placeholder", /9/);
 });
 
+test("record pipeline counts and a priority site; the dashboard shows them", async ({ page }) => {
+  await page.goto("/inventory");
+  const fqc = page.locator("#pl-ext-fqc");
+  await fqc.fill("421");
+  await page.locator("#pl-zdt-quality_issues").fill("2");
+  await page.getByRole("button", { name: /Save counts for/ }).click();
+  await expect(page.getByText(/Pipeline counts for .* saved/)).toBeVisible();
+  await page.getByLabel("Site", { exact: true }).fill("Test Ridge");
+  await page.getByLabel("Customer", { exact: true }).fill("Vestas");
+  await page.getByLabel("WTGs active", { exact: true }).fill("12");
+  await page.getByRole("button", { name: "Add priority site" }).click();
+  await expect(page.getByText("Test Ridge saved")).toBeVisible();
+  await page.goto("/dashboard");
+  const ext = page.locator("article", { has: page.getByRole("heading", { name: "External Blade Analytics" }) });
+  await expect(ext).toContainText("421");
+  await expect(page.getByText("Test Ridge")).toBeVisible();
+});
+
 test("mark attendance by hand", async ({ page }) => {
   await page.goto("/attendance");
   await page.getByLabel("Person", { exact: true }).selectOption({ label: "Dev Admin" });
@@ -117,12 +135,12 @@ test("mark attendance by hand", async ({ page }) => {
   await expect(page.getByRole("status")).toBeVisible();
 });
 
-for (const p of ["/me", "/approvals", "/inventory", "/people", "/settings", "/data-sources", "/overview", "/attendance", "/output", "/employees", "/reports", "/alerts"])
+for (const p of ["/dashboard", "/me", "/approvals", "/inventory", "/people", "/settings", "/data-sources", "/overview", "/attendance", "/output", "/employees", "/reports", "/alerts"])
   test(`renders ${p}`, async ({ page }) => noErrors(page, p));
 
 test("phone layout has no horizontal scroll on entry pages", async ({ browser }) => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  for (const p of ["/me", "/approvals", "/inventory", "/people"]) {
+  for (const p of ["/dashboard", "/me", "/approvals", "/inventory", "/people"]) {
     await page.goto(p);
     await page.waitForLoadState("networkidle");
     const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
