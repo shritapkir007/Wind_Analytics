@@ -81,11 +81,11 @@ export default async function Overview({ searchParams }: { searchParams: Promise
   const trendF = { ...filter, from: filter.from < addDays(filter.to, -29) ? filter.from : addDays(filter.to, -29) };
   const series = outputSeries(ds, trendF, v.grain);
   const cats = series.map((p) => (v.grain === "month" ? p.bucket.slice(0, 7) : fmtDate(p.bucket)));
-  const famSeries = FAMILIES.filter((f) => series.some((p) => (p.byFamily[f] ?? 0) > 0)).map((f) => ({
+  const famSeries = FAMILIES.filter((f) => series.some((p) => (p.tdByFamily[f] ?? 0) > 0)).map((f) => ({
     name: f,
     color: FAMILY_COLOR[f],
     stack: "out",
-    data: series.map((p) => (p.byFamily[f] ? Math.round(p.byFamily[f]! * 100) / 100 : 0)),
+    data: series.map((p) => (p.tdByFamily[f] ? Math.round(p.tdByFamily[f]! * 100) / 100 : 0)),
   }));
   const prodSeries = [{ name: "Team productivity", color: "var(--s1)", data: series.map((p) => (p.productivityPct == null ? null : Math.round(p.productivityPct))) }];
 
@@ -125,11 +125,11 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         <KpiCard label="Absent today" value={fmtNum(hc.absent)} sub="LoP in Calendar View" tone={hc.absent > 0 ? "warning" : "default"} delta={{ ...change(hc.absent, hcPrev.absent), upIsGood: false, label: `vs ${fmtDate(prevDay)}` }} href={`/attendance${q({ preset: "today" })}#today`} formula="People marked LoP in Calendar View today. Unplanned leave (an approved 'Time Off – Unplanned' request) counts as leave, not absence. A missing output entry is never counted as absence." />
       </div>
 
-      <h2 className="mb-2 text-[12px] font-semibold tracking-wide text-muted uppercase">Output (WTG process-steps)</h2>
+      <h2 className="mb-2 text-[12px] font-semibold tracking-wide text-muted uppercase">Output (target-days)</h2>
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
-        <KpiCard label={`Daily output · ${fmtDate(lastOutputDate)}`} value={fmtNum(day.totalSteps)} sub={`${day.people} people logged`} delta={{ ...change(day.totalSteps, dayPrev.totalSteps), label: dLabel(prevOutDay.from, prevOutDay.to) }} href={`/output${q({ preset: "custom", from: lastOutputDate, to: lastOutputDate })}`} formula="Σ of every process column in User Input for the latest working day that most present people have logged (today after people log, otherwise the previous working day). One turbine passing Prescreen, Analysis and FQC counts 3 steps; see Deliveries for turbine counts." />
-        <KpiCard label={`Weekly output · ${fmtRange(wk.from, wk.to)}`} value={fmtNum(week.totalSteps)} sub={`${fmtNum(week.targetDays, 1)} target-days earned`} delta={{ ...change(week.totalSteps, weekPrev.totalSteps), label: "vs same days last week" }} href={`/output${q({ preset: "this_week" })}`} formula="Σ User Input quantities from Monday to the latest reported working day, compared with the same weekdays of the previous week." />
-        <KpiCard label={`Monthly output · ${fmtRange(mo.from, mo.to)}`} value={fmtNum(month.totalSteps)} sub={`${fmtNum(month.targetDays, 1)} target-days earned`} delta={{ ...change(month.totalSteps, monthPrev.totalSteps), label: "vs same days last month" }} href={`/output${q({ preset: "this_month" })}`} formula="Σ User Input quantities from the 1st of the month to the latest reported working day, compared with the same day-range of the previous month." />
+        <KpiCard label={`Daily output · ${fmtDate(lastOutputDate)}`} value={fmtNum(day.targetDays, 1)} unit="target-days" sub={`${day.people} people logged`} delta={{ ...change(day.targetDays, dayPrev.targetDays), label: dLabel(prevOutDay.from, prevOutDay.to) }} href={`/output${q({ preset: "custom", from: lastOutputDate, to: lastOutputDate })}`} formula="Target-days for the latest working day that most present people have logged (today after people log, otherwise the previous working day). Each process is converted with its own target (quantity ÷ target per day) before adding, so different processes are never added as raw counts. Processes without a target are listed per process on Output & Deliveries." />
+        <KpiCard label={`Weekly output · ${fmtRange(wk.from, wk.to)}`} value={fmtNum(week.targetDays, 1)} unit="target-days" sub={`${week.people} people logged`} delta={{ ...change(week.targetDays, weekPrev.targetDays), label: "vs same days last week" }} href={`/output${q({ preset: "this_week" })}`} formula="Target-days from Monday to the latest reported working day, compared with the same weekdays of the previous week. Each process is converted with its own target (quantity ÷ target per day) before adding, so different processes are never added as raw counts. Processes without a target are listed per process on Output & Deliveries." />
+        <KpiCard label={`Monthly output · ${fmtRange(mo.from, mo.to)}`} value={fmtNum(month.targetDays, 1)} unit="target-days" sub={`${month.people} people logged`} delta={{ ...change(month.targetDays, monthPrev.targetDays), label: "vs same days last month" }} href={`/output${q({ preset: "this_month" })}`} formula="Target-days from the 1st of the month to the latest reported working day, compared with the same day-range of the previous month. Each process is converted with its own target (quantity ÷ target per day) before adding, so different processes are never added as raw counts. Processes without a target are listed per process on Output & Deliveries." />
       </div>
 
       <h2 className="mb-2 text-[12px] font-semibold tracking-wide text-muted uppercase">Performance &amp; delivery · {fmtRange(v.from, v.to)}</h2>
@@ -145,7 +145,7 @@ export default async function Overview({ searchParams }: { searchParams: Promise
 
       <div className="mb-4 grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Output by work category" subtitle={`WTG process-steps per ${v.grain} · ${fmtRange(trendF.from, trendF.to)}`} info="Raw quantities from User Input grouped into work categories. Categories are not comparable in effort; use productivity for that." />
+          <CardHeader title="Output by work category" subtitle={`Target-days per ${v.grain} · ${fmtRange(trendF.from, trendF.to)}`} info="Each process is converted with its own target before adding, so categories are comparable. Raw counts per process are on Output & Deliveries." />
           <CardBody>
             <ColumnChart categories={cats} series={famSeries} label="Output by work category over time" />
           </CardBody>

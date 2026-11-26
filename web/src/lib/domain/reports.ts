@@ -109,7 +109,7 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
     );
   }
   rep.kpis.push(
-    { label: "Output (process-steps)", value: String(r2(out.totalSteps)), note: `${signed(delta(out.totalSteps, outP.totalSteps))} vs ${fmtRange(prev.from, prev.to)}` },
+    { label: "Target-days earned", value: String(r1(out.targetDays)), note: `${signed(delta(out.targetDays, outP.targetDays))} vs ${fmtRange(prev.from, prev.to)} · each process ÷ its own target` },
     { label: "Team productivity", value: pct(tot.productivityPct), note: `previous ${pct(totP.productivityPct)}` },
     { label: "Target vs actual", value: pct(tot.targetAchievementPct) },
     { label: "Delivered (WTG)", value: String(r2(del.reduce((a, d) => a + d.delivered, 0))) },
@@ -136,7 +136,7 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
 
   rep.tables.push({
     title: kind === "monthly" ? "Employee ranking" : "Employee-wise output & performance",
-    columns: ["Rank", "Employee", "Team", "Present days", "Output (steps)", "Target-days", "Productivity", "Coverage", "Main processes"],
+    columns: ["Rank", "Employee", "Team", "Present days", "Target-days", "Productivity", "Coverage", "Main processes"],
     rows: perf
       .filter((p) => p.output.totalSteps > 0 || p.attendance.presentDays > 0)
       .map((p) => [
@@ -144,7 +144,6 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
         p.employee.name,
         teamLabel(p.employee.section),
         r1(p.attendance.presentDays),
-        r2(p.output.totalSteps),
         r2(p.output.targetDays),
         pct(p.productivityPct),
         pct(p.coveragePct),
@@ -173,8 +172,8 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
     const series = outputSeries(ds, f, kind === "monthly" ? "week" : "day");
     rep.tables.push({
       title: kind === "monthly" ? "Output trend by week" : "Output & attendance by day",
-      columns: ["Period", "Output (steps)", "Target-days", "Present days", "Productivity"],
-      rows: series.map((s) => [kind === "monthly" ? `Week of ${fmtDate(s.bucket)}` : fmtDate(s.bucket), r2(s.total), r2(s.targetDays), r1(s.presentDays), pct(s.productivityPct)]),
+      columns: ["Period", "Target-days", "Present days", "Productivity"],
+      rows: series.map((s) => [kind === "monthly" ? `Week of ${fmtDate(s.bucket)}` : fmtDate(s.bucket), r2(s.targetDays), r1(s.presentDays), pct(s.productivityPct)]),
     });
     const row = (label: string, members: typeof emps) => {
       const a = members.map((e) => attendanceFor(ds, e.key, range));
@@ -234,8 +233,8 @@ export function buildReport(ds: Dataset, kind: ReportKind, range: { from: string
     if (rate != null && rate < 50) rep.insights.push(`${d.stream}: only ${pct(rate)} delivery rate — pending inventory (${r2(d.inventory)}) exceeds what was delivered (${r2(d.delivered)}).`);
   }
   if (overdue.length) rep.insights.push(`${overdue.length} overdue task(s) need follow-up.`);
-  const dP = delta(out.totalSteps, outP.totalSteps);
-  if (dP != null && Math.abs(dP) >= 10) rep.insights.push(`Output ${dP > 0 ? "rose" : "fell"} ${Math.abs(Math.round(dP))}% compared with ${fmtRange(prev.from, prev.to)}.`);
+  const dP = delta(out.targetDays, outP.targetDays);
+  if (dP != null && Math.abs(dP) >= 10) rep.insights.push(`Target-days earned ${dP > 0 ? "rose" : "fell"} ${Math.abs(Math.round(dP))}% compared with ${fmtRange(prev.from, prev.to)}.`);
   if (!rep.insights.length) rep.insights.push("No exceptions found for this period.");
 
   // Days with no data in range (to warn about partial periods)
