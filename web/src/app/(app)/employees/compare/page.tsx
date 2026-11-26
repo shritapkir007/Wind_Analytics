@@ -31,7 +31,7 @@ export default async function Compare({ searchParams }: { searchParams: Promise<
     ["Present days", (p) => fmtNum(p.attendance.presentDays, 1)],
     ["Attendance", (p) => fmtPct(p.attendance.attendancePct, 1)],
     ["Leave days", (p) => fmtNum(p.attendance.leaveDays, 1)],
-    ["Output (steps)", (p) => fmtNum(p.output.totalSteps)],
+    ["Days with output", (p) => fmtNum(p.daysWithOutput)],
     ["Target-days earned", (p) => fmtNum(p.output.targetDays, 1)],
     ["Productivity", (p) => fmtPct(p.productivityPct), "Target-days ÷ present days"],
     ["Target coverage", (p) => fmtPct(p.coveragePct), "Share of output in targeted processes"],

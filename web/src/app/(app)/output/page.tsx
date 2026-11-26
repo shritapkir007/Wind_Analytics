@@ -46,7 +46,7 @@ export default async function Output({ searchParams }: { searchParams: Promise<S
   const trendF = diffDays(v.from, v.to) < 13 ? { ...filter, from: addDays(v.to, -29) } : filter;
   const series = outputSeries(ds, trendF, v.grain);
   const cat = (b: string) => (v.grain === "month" ? fmtMonth(b) : fmtDate(b));
-  const famSeries = FAMILIES.filter((f) => series.some((p) => (p.byFamily[f] ?? 0) > 0)).map((f) => ({ name: f, color: FAMILY_COLOR[f], stack: "o", data: series.map((p) => Math.round((p.byFamily[f] ?? 0) * 100) / 100) }));
+  const famSeries = FAMILIES.filter((f) => series.some((p) => (p.tdByFamily[f] ?? 0) > 0)).map((f) => ({ name: f, color: FAMILY_COLOR[f], stack: "o", data: series.map((p) => Math.round((p.tdByFamily[f] ?? 0) * 100) / 100) }));
 
   const dF = diffDays(v.from, v.to) < 13 ? { from: addDays(v.to, -29), to: v.to } : { from: v.from, to: v.to };
   const dSeries = deliverySeries(ds, dF, v.grain);
@@ -79,8 +79,8 @@ export default async function Output({ searchParams }: { searchParams: Promise<S
       <FilterBar {...barProps} families={FAMILIES} showFamily showGrain />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Output" value={fmtNum(out.totalSteps)} unit="steps" sub={`${out.people} people · ${out.submissions} entries`} delta={{ ...change(out.totalSteps, outPrev.totalSteps), label: `vs ${fmtRange(cmp.from, cmp.to)}` }} formula="Σ of all process quantities in User Input. One turbine through Prescreen, Analysis and FQC = 3 steps." />
-        <KpiCard label="Target-days earned" value={fmtNum(out.targetDays, 1)} sub={`${fmtPct(out.totalSteps ? (out.targetedQty / out.totalSteps) * 100 : null)} of output has a target`} delta={{ ...change(out.targetDays, outPrev.targetDays), label: "vs previous period" }} formula="Σ quantity ÷ that process's target per day (upper end of its range in Settings), for processes counted in productivity." />
+        <KpiCard label="Entries logged" value={fmtNum(out.submissions)} sub={`${out.people} people`} delta={{ ...change(out.submissions, outPrev.submissions), label: `vs ${fmtRange(cmp.from, cmp.to)}` }} formula="Daily output entries (one per person per day). Quantities are shown per process below and are never added across processes." />
+        <KpiCard label="Target-days earned" value={fmtNum(out.targetDays, 1)} sub="Each process ÷ its own target" delta={{ ...change(out.targetDays, outPrev.targetDays), label: "vs previous period" }} formula="Σ quantity ÷ that process's target per day (upper end of its range in Settings), for processes counted in productivity." />
         <KpiCard label="Team productivity" value={fmtPct(totals.productivityPct)} sub={`${fmtNum(totals.presentDays, 1)} present days`} delta={{ ...change(totals.productivityPct, totalsPrev.productivityPct), label: "vs previous period", suffix: " pts" }} tone={totals.productivityPct != null && totals.productivityPct < 80 ? "warning" : "default"} formula="Target-days earned ÷ present days (Calendar View)." />
         <KpiCard label="Target vs actual" value={fmtPct(totals.targetAchievementPct)} sub={`${fmtNum(totals.targetQtyActual)} of ${fmtNum(totals.targetQtyExpected)} expected`} href="#targets" />
         <KpiCard label="Delivered" value={fmtNum(sum(del, "delivered"))} unit="WTG" sub="Active ZV" delta={{ ...change(sum(del, "delivered"), sum(delPrev, "delivered")), label: "vs previous period" }} href="#deliveries" />
@@ -91,7 +91,7 @@ export default async function Output({ searchParams }: { searchParams: Promise<S
 
       <div className="mb-4 grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Output trend by work category" subtitle={`Process-steps per ${v.grain} · ${fmtRange(trendF.from, trendF.to)}`} />
+          <CardHeader title="Output trend by work category" subtitle={`Target-days per ${v.grain} · ${fmtRange(trendF.from, trendF.to)} (each process ÷ its own target)`} />
           <CardBody>
             <ColumnChart categories={series.map((p) => cat(p.bucket))} series={famSeries} label="Output trend by work category" />
           </CardBody>
@@ -277,19 +277,16 @@ export default async function Output({ searchParams }: { searchParams: Promise<S
               { key: "date", header: "Output date" },
               { key: "who", header: "Employee" },
               { key: "work", header: "Processes" },
-              { key: "steps", header: "Steps", align: "right" },
               { key: "td", header: "Target-days", align: "right" },
               { key: "sub", header: "Submitted", hideOnMobile: true },
               { key: "row", header: "Row", align: "right", hideOnMobile: true },
             ]}
             rows={subs.map((s) => {
-              let steps = 0;
               let td = 0;
               const parts: string[] = [];
               for (const [p, n] of Object.entries(s.entries)) {
                 const info = ds.processes.get(p)!;
                 if (v.family && info.family !== v.family) continue;
-                steps += n;
                 if (info.counts) td += n / info.target.perDay!;
                 parts.push(`${info.label} ${n}`);
               }
@@ -298,10 +295,9 @@ export default async function Output({ searchParams }: { searchParams: Promise<S
                 date: { v: s.date, label: fmtDate(s.date, true) },
                 who: { v: ds.emp.get(s.employeeKey)?.name ?? s.employeeKey, href: `/employees/${encodeURIComponent(s.employeeKey)}${q({ employee: null })}` },
                 work: parts.join(" · ") || "—",
-                steps: Math.round(steps * 100) / 100,
                 td: Math.round(td * 100) / 100,
                 sub: { v: s.submittedAt, label: s.submittedAt ? `${fmtDate(s.submittedAt.slice(0, 10))} ${s.submittedAt.slice(11, 16)}${late ? " · late" : ""}` : "—", tone: late ? "warning" : undefined },
-                row: { v: s.sourceRow, label: String(s.sourceRow) },
+                row: { v: s.sourceRow, label: s.sourceRow ? String(s.sourceRow) : "app" },
               };
             })}
           />

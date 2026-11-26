@@ -328,7 +328,7 @@ export function teamPerformance(ds: Dataset, f: Filter): EmployeePerformance[] {
   const rows = [...keys].map((k) => employeePerformance(ds, k, f));
   const ranked = rows.filter((r) => r.rankable).sort((a, b) => b.productivityPct! - a.productivityPct!);
   ranked.forEach((r, i) => (r.rank = i + 1));
-  return rows.sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || b.output.totalSteps - a.output.totalSteps);
+  return rows.sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || b.output.targetDays - a.output.targetDays);
 }
 
 export interface TeamTotals {
@@ -414,6 +414,8 @@ export function bucketOf(date: string, g: Grain): string {
 export interface SeriesPoint {
   bucket: string;
   byFamily: Partial<Record<Family, number>>;
+  /** Target-days per work category: each process converted with its own target, then added. */
+  tdByFamily: Partial<Record<Family, number>>;
   total: number;
   targetDays: number;
   presentDays: number;
@@ -424,7 +426,7 @@ export function outputSeries(ds: Dataset, f: Filter, g: Grain): SeriesPoint[] {
   const map = new Map<string, SeriesPoint>();
   const get = (b: string) => {
     let p = map.get(b);
-    if (!p) map.set(b, (p = { bucket: b, byFamily: {}, total: 0, targetDays: 0, presentDays: 0, productivityPct: null }));
+    if (!p) map.set(b, (p = { bucket: b, byFamily: {}, tdByFamily: {}, total: 0, targetDays: 0, presentDays: 0, productivityPct: null }));
     return p;
   };
   for (const d of eachDay(f.from, f.to)) get(bucketOf(d, g));
@@ -435,7 +437,10 @@ export function outputSeries(ds: Dataset, f: Filter, g: Grain): SeriesPoint[] {
       const info = ds.processes.get(proc)!;
       p.total += q;
       p.byFamily[info.family] = (p.byFamily[info.family] ?? 0) + q;
-      if (info.counts) p.targetDays += q / info.target.perDay!;
+      if (info.counts) {
+        p.targetDays += q / info.target.perDay!;
+        p.tdByFamily[info.family] = (p.tdByFamily[info.family] ?? 0) + q / info.target.perDay!;
+      }
     }
   }
   const emps = employeesInScope(ds, f);
